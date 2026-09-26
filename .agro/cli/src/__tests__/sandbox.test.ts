@@ -174,6 +174,7 @@ describe("agro sandbox upgrade", () => {
 
   it("restores the inspected container image rather than the updated CLI image for an unpinned entry", async () => {
     registry();
+    vi.stubEnv("SANDBOX_NAME", "box");
     const root = seed("box", { mode: "image", pullPolicy: "always" });
     const before = readFileSync(join(root, "agro.json"), "utf8");
     const oldImage = officialImageRef("0.12.0");
@@ -204,6 +205,7 @@ describe("agro sandbox upgrade", () => {
     { status: 0, stdout: "  \n" },
   ])("refuses an unpinned upgrade when inspect cannot identify the prior image (%j)", async (result) => {
     registry();
+    vi.stubEnv("SANDBOX_NAME", "box");
     const root = seed("box", { mode: "image" });
     const before = readFileSync(join(root, "agro.json"), "utf8");
     const calls: RecordedCall[] = [];
