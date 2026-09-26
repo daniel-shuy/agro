@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 const ROOT = join(import.meta.dirname, "../../..");
 const SCRIPT = join(ROOT, ".agro", "scripts", "sandbox-boot-smoke.sh");
 const PREFIX = "/home/sandbox/.local";
+const SMOKE_TEST_TIMEOUT_MS = 30_000;
 
 const HOST_UID = String(process.getuid?.() ?? 0);
 const HOST_GID = String(process.getgid?.() ?? 0);
@@ -206,7 +207,7 @@ function runSmoke(fx: ReturnType<typeof fixture>, extraEnv: Record<string, strin
   });
 }
 
-describe("sandbox boot smoke systemd supervision", () => {
+describe("sandbox boot smoke systemd supervision", { timeout: SMOKE_TEST_TIMEOUT_MS }, () => {
   it("fails when PID 1 is not systemd", () => {
     const result = runSmoke(fixture({ pid1: "docker-init" }));
 
@@ -245,7 +246,7 @@ describe("sandbox boot smoke systemd supervision", () => {
   });
 });
 
-describe("sandbox boot smoke", () => {
+describe("sandbox boot smoke", { timeout: SMOKE_TEST_TIMEOUT_MS }, () => {
   it("starts the sandbox service, polls the healthcheck, and tears down", () => {
     const fx = fixture();
 
