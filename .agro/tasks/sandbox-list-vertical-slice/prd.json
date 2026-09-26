@@ -124,8 +124,9 @@
       ],
       "priority": 6,
       "dependsOn": ["US-005"],
-      "passes": false,
-      "notes": "",
+      "passes": true,
+      "commit": "3468b78b",
+      "notes": "Executed: executable-level CLI tests cover upgrade help, invalid flags and CLI-only agro update; integrated targeted tests (0, 208 passed). Docs and changelog diff reviewed. Executed: pnpm run lint && pnpm run typecheck && pnpm test && pnpm run build:harness && bash .agro/evals/probes/agro-sandbox-image-mode.sh && bash .agro/evals/probes/sandbox-registry.sh (0). Executed: STE checker docs/lifecycle-commands.md (0); README/changelog pre-existing findings outside changed lines noted.",
       "files": [
         ".agro/cli/src/__tests__/cli-first-help.test.ts",
         ".agro/cli/src/cli.ts",
