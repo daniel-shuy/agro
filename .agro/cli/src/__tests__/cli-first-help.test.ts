@@ -31,6 +31,7 @@ describe("cli-first help — the single agro identity", () => {
     const text = captureStdout(() => printAgroHelp(AGRO_PRODUCT));
     expect(text).toMatch(/^ {2}agro self-upgrade +Upgrade the installed agro CLI$/m);
     expect(text).toMatch(/^ {2}agro vendor +Vendor or upgrade the \.agro\/ control plane$/m);
+    expect(text).toMatch(/^ {2}agro sandbox <args\.\.\.> +Create, list, and upgrade sandboxes \(install\|list\|upgrade\)$/m);
     expect(text).toMatch(/^agro — AGRO CLI/);
   });
 
@@ -50,6 +51,7 @@ describe("cli-first help — the single agro identity", () => {
     const text = captureStdout(() => printSandboxHelp("agro"));
     expect(text).toMatch(/^agro sandbox — Create and list sandboxes\n/);
     expect(text).toMatch(/^  agro sandbox list \[--json\]$/m);
+    expect(text).toMatch(/^  agro sandbox upgrade <name> --version <X\.Y\.Z>$/m);
   });
 });
 
@@ -122,6 +124,7 @@ describe.skipIf(!ESBUILD_AVAILABLE)(
       expect(top.code).toBe(0);
       expect(top.stdout).toMatch(/^ {2}agro self-upgrade +Upgrade the installed agro CLI$/m);
       expect(top.stdout).toMatch(/^ {2}agro vendor +Vendor or upgrade the \.agro\/ control plane$/m);
+      expect(top.stdout).toMatch(/^ {2}agro sandbox <args\.\.\.> +Create, list, and upgrade sandboxes \(install\|list\|upgrade\)$/m);
     });
 
     it("agro update is an alias of self-upgrade and refuses payload flags", () => {
@@ -129,10 +132,67 @@ describe.skipIf(!ESBUILD_AVAILABLE)(
       expect(cmd.code).toBe(0);
       expect(cmd.stdout).toContain("Upgrade the installed agro CLI");
       expect(cmd.stdout).not.toContain("--from-remote [--ref <ref>]");
+      expect(cmd.stdout).not.toContain("sandbox upgrade");
 
       expect(run(AGRO_JS, ["update", "--from"]).stderr).toMatch(
         /^agro self-upgrade: --from belongs to the project-payload command; run `agro vendor --from` — agro self-upgrade upgrades only the installed CLI\n/,
       );
+    });
+
+    it("sandbox upgrade help exits successfully without provisioning", () => {
+      for (const flag of ["--help", "-h"]) {
+        const result = run(AGRO_JS, ["sandbox", "upgrade", flag]);
+        expect(result.code).toBe(0);
+        expect(result.stdout).toMatch(/^  agro sandbox upgrade <name> --version <X\.Y\.Z>$/m);
+        expect(result.stderr).toBe("");
+      }
+    });
+
+    it("sandbox upgrade rejects missing name, version, invalid version, latest, and extra arguments", () => {
+      const home = mkdtempSync(join(tmpdir(), "agro-upgrade-invalid-"));
+      try {
+        for (const [tail, error] of [
+          [[], "a name is required"],
+          [["--version", "1.2.3"], "a name is required"],
+          [["demo"], "--version is required"],
+          [["demo", "--version"], "--version requires a value"],
+          [["demo", "--version", "latest"], '--version "latest" is not a release version'],
+          [["demo", "--latest"], 'unknown flag "--latest"'],
+          [["demo", "--version", "1.2.3", "extra"], 'unexpected argument "extra"'],
+        ] as const) {
+          const result = run(AGRO_JS, ["sandbox", "upgrade", ...tail], { AGRO_HOME: home });
+          expect(result.code).toBe(1);
+          expect(result.stdout).toBe("");
+          expect(result.stderr).toContain(`agro sandbox upgrade: ${error}`);
+          expect(existsSync(join(home, "sandboxes"))).toBe(false);
+        }
+      } finally {
+        rmSync(home, { recursive: true, force: true });
+      }
+    });
+
+    it("sandbox upgrade refuses the sandbox execution target and an absent host entry", () => {
+      const home = mkdtempSync(join(tmpdir(), "agro-upgrade-absent-"));
+      try {
+        expect(run(AGRO_JS, ["sandbox", "upgrade", "demo", "--version", "v1.2.3"], {
+          AGRO_HOME: home,
+          AGRO_EXECUTION_TARGET: "local",
+        })).toEqual({
+          code: 1,
+          stdout: "",
+          stderr: "agro sandbox upgrade: host-only — run this command on the host\n",
+        });
+        expect(run(AGRO_JS, ["sandbox", "upgrade", "demo", "--version", "1.2.3"], {
+          AGRO_HOME: home,
+        })).toEqual({
+          code: 1,
+          stdout: "",
+          stderr: 'agro sandbox upgrade: no sandbox entry named "demo"\n',
+        });
+        expect(existsSync(join(home, "sandboxes"))).toBe(false);
+      } finally {
+        rmSync(home, { recursive: true, force: true });
+      }
     });
 
     it("agro --version and agro -v print the bare CLI version", () => {

@@ -80,7 +80,7 @@ agro tool install agent-browser   # asks before the ~1 GB Chromium download
 into the current environment instead of driving the container over Docker
 Compose. Detection is automatic (`/.dockerenv` plus `SANDBOX_NAME`); override it
 with `AGRO_EXECUTION_TARGET=local` or `AGRO_EXECUTION_TARGET=docker-compose`.
-`agro sandbox install` remains host-only and says so.
+`agro sandbox install` and `agro sandbox upgrade` remain host-only and say so.
 
 ## Commands
 
@@ -88,6 +88,7 @@ with `AGRO_EXECUTION_TARGET=local` or `AGRO_EXECUTION_TARGET=docker-compose`.
 |---|---|
 | `agro sandbox install <runtime>` | Create a sandbox: run the wizard, write the registry entry under `${AGRO_HOME:-~/.agro}/sandboxes/<name>/`, materialise the compose files and wrapper into it, and boot the container. Flags: `--name`, `--checkout <dir>` (alias `--repo <dir>`), `--home-mount <dir>`, `--yes`, `--image[=<ref>]`, `--no-build`, `--print-argv`. `docker` is provisionable; `microsandbox` is planned and refuses with a pointer at the runtime RFC. |
 | `agro sandbox list [--json]` | List the registry entries with name, runtime, container status, and bound checkout. |
+| `agro sandbox upgrade <name> --version <X.Y.Z>` | Recreate one image-mode sandbox immediately with the specified official release image. Keep the home mount, named volumes, checkout, `.env`, and unrelated settings. |
 | `agro shell [name]` | Open a `zsh` shell in the running sandbox container. |
 | `agro stop [name]` | Stop the sandbox, preserving volumes. |
 | `agro restart [name]` | Restart the sandbox service. |
@@ -120,7 +121,18 @@ runs `.agro/scripts/docker-compose.sh` — see
 [lifecycle commands](https://github.com/mifunedev/agro/blob/main/docs/lifecycle-commands.md), which also
 states the confirmation policy `agro destroy` carries.
 
-`agro update` never touches a project. During the compatibility window `agro vendor` vendors
+`agro sandbox upgrade <name> --version X.Y.Z` runs only on the host. The command
+requires an explicit release version and accepts a leading `v` or prerelease
+suffix. The command refuses `latest`, absent entries, and build-mode entries.
+The immediate container recreation interrupts active sessions, servers, and jobs.
+The command keeps the home mount and named volumes; it never uses `down -v`.
+A successful start records `image.ref`. On failure, the command keeps the prior
+`image.ref` and attempts to restore the prior image. The command reports a failed
+restoration. The command locks the entry during an upgrade. The command refuses
+conflicting `AGRO_SANDBOX_IMAGE` values in the host shell or entry `.env` before recreation. See [lifecycle commands](https://github.com/mifunedev/agro/blob/main/docs/lifecycle-commands.md#upgrading-a-sandbox-image-agro-sandbox-upgrade).
+
+`agro update` upgrades only the installed CLI. It does not recreate the sandbox
+or change its image. During the compatibility window `agro vendor` vendors
 `.agro/` + `crons/` into the current directory, equipping an empty checkout and upgrading an
 equipped one (`--from <dir>` / `--from-remote [--ref <ref>]`, `--dry-run`, `--force`); it
 writes nothing else and never prompts. `agro update` rejects those flags and points at

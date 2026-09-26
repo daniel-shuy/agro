@@ -113,7 +113,7 @@ export function printAgroHelp(product: Product = AGRO_PRODUCT): void {
   process.stdout.write(`${bin} — ${title} (v${VERSION})
 
 Usage:
-  ${bin} sandbox <args...>      Create and list sandboxes (install|list)
+  ${bin} sandbox <args...>      Create, list, and upgrade sandboxes (install|list|upgrade)
   ${bin} shell [name]           Open a zsh shell in the running sandbox container
   ${bin} config <args...>       Read and write ${stateNames(bin).configFile} (show|set), or run a wizard
   ${bin} secret <args...>       Read and write the gitignored root .env (set|list)
