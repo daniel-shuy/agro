@@ -61,8 +61,9 @@
       ],
       "priority": 3,
       "dependsOn": ["US-002"],
-      "passes": false,
-      "notes": "",
+      "passes": true,
+      "commit": "5d06ca15",
+      "notes": "Executed: inspected integrated diff; controllers/sandbox.ts owns parsing, help and install/list dispatch, while cli.ts only selects sandbox and re-exports existing APIs. Executed: pnpm run typecheck (0); pnpm run build:harness (0); pnpm exec vitest run .agro/cli/src/__tests__/sandbox.test.ts .agro/cli/src/__tests__/lifecycle.test.ts .agro/cli/src/__tests__/cli-first-help.test.ts .agro/cli/src/__tests__/cli.property.test.ts (0, 187 passed). Reasoned: controller copies sandbox help and parser unchanged; full suite verifies behavior.",
       "files": [
         ".agro/cli/src/cli.ts",
         ".agro/cli/src/controllers/sandbox.ts"
