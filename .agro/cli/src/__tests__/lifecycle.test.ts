@@ -25,6 +25,7 @@ import {
   type LifecycleRunner,
   type RunResult,
 } from "../commands/lifecycle.js";
+import { runSandboxCommand } from "../controllers/sandbox.js";
 import { agroConfigPath } from "../lib/agro-config.js";
 import { AGRO_VERSION, officialImageRef } from "../lib/version.js";
 import { withInvokedBinAsync } from "./invoked-bin.js";
@@ -900,6 +901,86 @@ describe("parseSandboxArgs — --version", () => {
     const text = captureStdout(printSandboxHelp);
     expect(text).toContain("--version <X.Y.Z>");
     expect(text).toMatch(/--image=<ref>[^\n]*custom image/);
+  });
+});
+
+describe("parseSandboxArgs — upgrade", () => {
+  const base = {
+    help: false,
+    yes: false,
+    image: false,
+    noBuild: false,
+    printArgv: false,
+    json: false,
+  };
+
+  it.each([
+    ["0.13.0", "0.13.0"],
+    ["v0.13.0", "0.13.0"],
+    ["0.13.0-rc.1", "0.13.0-rc.1"],
+    ["v0.13.0-beta.12", "0.13.0-beta.12"],
+  ])("selects sandbox box at release %s", (input, version) => {
+    expect(parseSandboxArgs(["upgrade", "box", "--version", input])).toEqual({
+      ok: true,
+      args: { ...base, subcommand: "upgrade", name: "box", version },
+    });
+  });
+
+  it.each([
+    { tokens: ["upgrade"], diagnostic: "a name is required" },
+    { tokens: ["upgrade", "", "--version", "1.2.3"], diagnostic: "a name is required" },
+    { tokens: ["upgrade", "--version", "1.2.3"], diagnostic: "a name is required" },
+    { tokens: ["upgrade", "box"], diagnostic: "--version is required" },
+    { tokens: ["upgrade", "box", "--version"], diagnostic: "--version requires a value" },
+    { tokens: ["upgrade", "box", "--version", ""], diagnostic: "--version requires a value" },
+    { tokens: ["upgrade", "box", "--version", "--latest"], diagnostic: "--latest" },
+    { tokens: ["upgrade", "box", "--latest"], diagnostic: "--latest" },
+    { tokens: ["upgrade", "box", "--version", "latest"], diagnostic: "X.Y.Z" },
+    { tokens: ["upgrade", "box", "--version", "1.2"], diagnostic: "X.Y.Z" },
+    { tokens: ["upgrade", "box", "--version", "1.2.3-rc"], diagnostic: "X.Y.Z" },
+    { tokens: ["upgrade", "box", "--version", "vv1.2.3"], diagnostic: "X.Y.Z" },
+    { tokens: ["upgrade", "box", "--version", "1.2.3", "extra"], diagnostic: "unexpected argument" },
+    { tokens: ["upgrade", "--help", "extra"], diagnostic: "a name is required" },
+    { tokens: ["upgrade", "box", "--version", "1.2.3", "--yes"], diagnostic: "unknown flag" },
+    { tokens: ["upgrade", "box", "--version", "1.2.3", "--version", "2.0.0"], diagnostic: "unexpected argument" },
+    { tokens: ["upgrade", "box", "--version=1.2.3"], diagnostic: "--version=1.2.3" },
+    { tokens: ["upgrade", "box", "1.2.3", "--version", "2.0.0"], diagnostic: "unexpected argument" },
+  ])("rejects $tokens with a diagnostic", ({ tokens, diagnostic }) => {
+    const parsed = parseSandboxArgs(tokens);
+    expect(parsed.ok).toBe(false);
+    if (!parsed.ok) expect(parsed.error).toContain(diagnostic);
+  });
+
+  it.each([
+    ["upgrade"],
+    ["upgrade", "box"],
+    ["upgrade", "box", "--latest"],
+    ["upgrade", "box", "--version", "latest"],
+    ["upgrade", "box", "--version", "1.2.3", "extra"],
+  ])("returns non-zero and a diagnostic for %j", async (...tokens) => {
+    const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    expect(await runSandboxCommand(tokens, "agro")).toBe(1);
+    expect(stderr.mock.calls.map((call) => String(call[0])).join("")).toContain("agro sandbox upgrade:");
+  });
+
+  it("shows sandbox help for upgrade --help", () => {
+    expect(parseSandboxArgs(["upgrade", "--help"])).toEqual({
+      ok: true,
+      args: { ...base, subcommand: "upgrade", help: true },
+    });
+  });
+
+  it("does not dispatch a parsed upgrade to sandbox install", async () => {
+    const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    expect(await runSandboxCommand(["upgrade", "box", "--version", "1.2.3"], "agro")).toBe(1);
+    expect(stderr.mock.calls.map((call) => String(call[0])).join("")).toContain("sandbox upgrade");
+  });
+
+  it("documents the upgrade syntax without changing the CLI update command", () => {
+    const text = captureStdout(printSandboxHelp);
+    expect(text).toContain("agro sandbox upgrade <name> --version <X.Y.Z>");
+    expect(text).toContain("agro sandbox install <runtime>");
+    expect(text).toContain("agro sandbox list [--json]");
   });
 });
 

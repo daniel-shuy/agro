@@ -29,6 +29,7 @@ Usage:
                                [--version <X.Y.Z> | --image[=<ref>]]
                                [--no-build] [--print-argv]
   ${bin} sandbox list [--json]
+  ${bin} sandbox upgrade <name> --version <X.Y.Z>
 
 \`install\` writes a sandbox entry under \${${stateNames(bin).envPrefix}HOME:-~/${stateNames(bin).userStateDir}}/sandboxes/<name>/,
 materialises the compose files and the compose wrapper into it, then starts the
@@ -77,8 +78,9 @@ Next: ${bin} shell <name>
 
 export interface SandboxArgs {
   help: boolean;
-  subcommand?: "install" | "list";
+  subcommand?: "install" | "list" | "upgrade";
   runtime?: string;
+  version?: string;
   name?: string;
   checkout?: string;
   homeMount?: string;
@@ -111,6 +113,36 @@ export function parseSandboxArgs(rest: string[], bin: string = AGRO_PRODUCT.bin)
   }
 
   const [head, ...tail] = rest;
+  if (head === "upgrade") {
+    if (tail.length === 1 && isHelpFlag(tail[0])) {
+      return { ok: true, args: { ...args, subcommand: "upgrade", help: true } };
+    }
+    const [name, flag, value, ...extra] = tail;
+    if (name === undefined || name === "" || name.startsWith("-")) {
+      return { ok: false, error: `${bin} sandbox upgrade: a name is required` };
+    }
+    if (flag === undefined) {
+      return { ok: false, error: `${bin} sandbox upgrade: --version is required` };
+    }
+    if (flag !== "--version") {
+      return { ok: false, error: `${bin} sandbox upgrade: ${flag.startsWith("-") ? "unknown flag" : "unexpected argument"} "${flag}"` };
+    }
+    if (value === undefined || value === "") {
+      return { ok: false, error: `${bin} sandbox upgrade: --version requires a value` };
+    }
+    if (value.startsWith("-")) {
+      return { ok: false, error: `${bin} sandbox upgrade: unknown flag "${value}"` };
+    }
+    const version = parseReleaseVersion(value);
+    if (version === undefined) {
+      return { ok: false, error: `${bin} sandbox upgrade: --version "${value}" is not a release version — expected X.Y.Z` };
+    }
+    if (extra.length > 0) {
+      const token = extra[0];
+      return { ok: false, error: `${bin} sandbox upgrade: ${token.startsWith("-") && token !== "--version" ? "unknown flag" : "unexpected argument"} "${token}"` };
+    }
+    return { ok: true, args: { ...args, subcommand: "upgrade", name, version } };
+  }
   if (head !== "install" && head !== "list") {
     return {
       ok: false,
@@ -227,6 +259,10 @@ export async function runSandboxCommand(rest: string[], bin: string): Promise<nu
     stderr: (s: string) => process.stderr.write(s),
   };
   if (a.subcommand === "list") return await runSandboxList({ bin, json: a.json }, io);
+  if (a.subcommand === "upgrade") {
+    io.stderr(`${bin} sandbox upgrade: not available yet\n`);
+    return 1;
+  }
   return await runSandboxInstall(
     {
       bin,
