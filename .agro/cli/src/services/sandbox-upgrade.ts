@@ -1,4 +1,4 @@
-import { closeSync, existsSync, openSync, readFileSync, unlinkSync } from "node:fs";
+import { closeSync, existsSync, openSync, readFileSync, unlinkSync, writeSync } from "node:fs";
 import { join } from "node:path";
 import { agroConfigPath, readAgroConfig, writeAgroConfig } from "../lib/agro-config.js";
 import { runningInsideSandbox } from "../lib/execution/index.js";
@@ -61,10 +61,14 @@ export async function runSandboxUpgrade(opts: SandboxUpgradeOptions, io: Lifecyc
   try {
     fd = openSync(lock, "wx", 0o600);
   } catch (error) {
-    io.stderr(`${prefix} ${error instanceof Error && "code" in error && error.code === "EEXIST" ? `upgrade already in progress for ${opts.name}` : errorMessage(error)}\n`);
+    const message = error instanceof Error && "code" in error && error.code === "EEXIST"
+      ? `upgrade already in progress for ${opts.name}; lock: ${lock}. Confirm no upgrade process owns this entry before removing that lock and retrying`
+      : errorMessage(error);
+    io.stderr(`${prefix} ${message}\n`);
     return 1;
   }
   try {
+    writeSync(fd, `${process.pid}\n`);
     const config = readAgroConfig(configFile);
     if (config.image?.mode !== "image") {
       io.stderr(`${prefix} ${opts.name} requires image.mode "image"\n`);

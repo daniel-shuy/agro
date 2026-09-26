@@ -126,10 +126,23 @@ The command applies the image through the existing Compose wrapper and records
 `image.ref` only after a successful start. If provisioning or config persistence
 fails, the command keeps the old `image.ref` and attempts to restore the prior
 image. If restoration fails, the command reports that failure. Inspect the
-sandbox with `agro ps <name>` and repair it before resuming work. A lock rejects
-another upgrade of the same entry until the first command exits. Other entries
-can upgrade independently. A conflicting `AGRO_SANDBOX_IMAGE` in the host
-shell or entry `.env` causes a refusal before recreation.
+sandbox with `agro ps <name>` and repair it before resuming work. The command
+creates `.sandbox-upgrade.lock` in the entry. It removes the lock after a normal
+success or failure. An abrupt interruption, including `SIGKILL` or a crash,
+can leave the lock in place. The command refuses another upgrade of that entry
+and prints the lock path. Other entries can upgrade independently.
+
+If an upgrade refuses because the lock exists, recover on the host:
+
+1. Confirm that no upgrade process owns the entry. A PID in the lock can help
+   identify a process, but a PID alone does not prove whether that process owns
+   the entry.
+2. Only after that confirmation, remove the exact lock path printed by the
+   command.
+3. Retry `agro sandbox upgrade <name> --version X.Y.Z`.
+
+A conflicting `AGRO_SANDBOX_IMAGE` in the host shell or entry `.env` causes a
+refusal before recreation.
 
 `agro sandbox upgrade` changes the sandbox image, not the installed host CLI.
 Use `agro update` to upgrade the installed CLI without changing a sandbox.

@@ -104,6 +104,7 @@ describe("agro sandbox upgrade", () => {
     const before = readFileSync(join(root, "agro.json"), "utf8");
     expect(await runSandboxUpgrade({ bin: "agro", name: "box", version: "0.13.0", run }, makeIo().io)).toBe(1);
     expect(readFileSync(join(root, "agro.json"), "utf8")).toBe(before);
+    expect(existsSync(join(root, ".sandbox-upgrade.lock"))).toBe(false);
     expect(calls).toEqual([]);
   });
 
@@ -117,6 +118,7 @@ describe("agro sandbox upgrade", () => {
     const argsSeen: string[][] = [];
     const run: LifecycleRunner = (cmd, args, opts) => {
       expect(cmd).toBe("bash");
+      expect(readFileSync(join(root, ".sandbox-upgrade.lock"), "utf8")).toBe(`${process.pid}\n`);
       expect(readJson(join(root, "agro.json"))).toEqual(before);
       envs.push(opts.env?.AGRO_SANDBOX_IMAGE ?? "");
       argsSeen.push([...args]);
@@ -206,6 +208,8 @@ describe("agro sandbox upgrade", () => {
     expect(await competing).toBe(1);
     expect(await independent).toBe(0);
     expect(err.join("")).toContain("already in progress");
+    expect(existsSync(join(root, ".sandbox-upgrade.lock"))).toBe(false);
+    expect(existsSync(join(entryRoot("other"), ".sandbox-upgrade.lock"))).toBe(false);
     expect(readJson(join(entryRoot("other"), "agro.json"))).toMatchObject({ image: { ref: officialImageRef("0.14.0") } });
   });
 
@@ -220,6 +224,7 @@ describe("agro sandbox upgrade", () => {
     writeFileSync(join(root, ".env"), `AGRO_SANDBOX_IMAGE=${previous}\n`);
     expect(await runSandboxUpgrade({ bin: "agro", name: "box", version: "0.13.0", run }, makeIo().io)).toBe(1);
     expect(readFileSync(join(root, "agro.json"), "utf8")).toBe(before);
+    expect(existsSync(join(root, ".sandbox-upgrade.lock"))).toBe(false);
     expect(calls).toEqual([]);
   });
 
@@ -230,7 +235,8 @@ describe("agro sandbox upgrade", () => {
     writeFileSync(lock, "other process");
     const { err, io } = makeIo();
     expect(await runSandboxUpgrade({ bin: "agro", name: "box", version: "0.13.0", run: makeRunner().run }, io)).toBe(1);
-    expect(err.join("")).toContain("already in progress");
+    expect(err.join("")).toContain(`upgrade already in progress for box; lock: ${lock}`);
+    expect(err.join("")).toContain("Confirm no upgrade process owns this entry before removing that lock and retrying");
     expect(readFileSync(lock, "utf8")).toBe("other process");
   });
 
