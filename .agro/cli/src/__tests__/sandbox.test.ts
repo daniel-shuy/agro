@@ -3,11 +3,12 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runSandboxInstall, runSandboxList, type SandboxIO } from "../commands/sandbox.js";
-import { entryRoot, resolveSandboxRoot } from "../lib/registry.js";
+import { entryRoot, materialize, resolveSandboxRoot } from "../lib/registry.js";
 import type { LifecycleRunner, RunResult } from "../lib/execution/runner.js";
 import { agroConfigPath, readAgroConfig } from "../lib/agro-config.js";
 import { renderComposeVars } from "../lib/config-render.js";
 import { AGRO_VERSION, officialImageRef } from "../lib/version.js";
+import { runSandboxUpgrade } from "../services/sandbox-upgrade.js";
 
 const cleanups: string[] = [];
 
@@ -78,6 +79,180 @@ function harnessCheckout(): string {
   writeFileSync(join(dir, ".devcontainer", "Dockerfile"), "FROM scratch\n");
   return dir;
 }
+
+describe("agro sandbox upgrade", () => {
+  const target = officialImageRef("0.13.0");
+  const previous = officialImageRef("0.12.0");
+
+  function seed(name = "box", image: Record<string, unknown> = { mode: "image", ref: previous }): string {
+    const root = entryRoot(name);
+    mkdirSync(root, { recursive: true });
+    writeFileSync(join(root, "agro.json"), `${JSON.stringify({
+      version: 1, name, runtime: "docker", image,
+      storage: { homePath: "/srv/persistent-home" }, checkout: "/srv/checkout",
+      access: { dockerSocket: true }, composeOverrides: ["other.yml"],
+    })}\n`);
+    materialize(root, { checkout: "/srv/checkout" });
+    return root;
+  }
+
+  it("refuses missing and build-mode entries without provisioning or writing", async () => {
+    registry();
+    const { run, calls } = makeRunner();
+    expect(await runSandboxUpgrade({ bin: "agro", name: "missing", version: "0.13.0", run }, makeIo().io)).toBe(1);
+    const root = seed("box", { mode: "build", ref: previous });
+    const before = readFileSync(join(root, "agro.json"), "utf8");
+    expect(await runSandboxUpgrade({ bin: "agro", name: "box", version: "0.13.0", run }, makeIo().io)).toBe(1);
+    expect(readFileSync(join(root, "agro.json"), "utf8")).toBe(before);
+    expect(existsSync(join(root, ".sandbox-upgrade.lock"))).toBe(false);
+    expect(calls).toEqual([]);
+  });
+
+  it("stages the selected image before config write and preserves home, checkout, dotenv and other fields", async () => {
+    registry();
+    const root = seed();
+    writeFileSync(join(root, ".env"), "GH_TOKEN=keep-this\n");
+    const before = readJson(join(root, "agro.json"));
+    const composeBefore = readFileSync(join(root, ".devcontainer", "docker-compose.yml"), "utf8");
+    const envs: string[] = [];
+    const argsSeen: string[][] = [];
+    const run: LifecycleRunner = (cmd, args, opts) => {
+      expect(cmd).toBe("bash");
+      expect(readFileSync(join(root, ".sandbox-upgrade.lock"), "utf8")).toBe(`${process.pid}\n`);
+      expect(readJson(join(root, "agro.json"))).toEqual(before);
+      envs.push(opts.env?.AGRO_SANDBOX_IMAGE ?? "");
+      argsSeen.push([...args]);
+      return { status: 0 };
+    };
+    expect(await runSandboxUpgrade({ bin: "agro", name: "box", version: "0.13.0", run }, makeIo().io)).toBe(0);
+    expect(envs).toEqual([target]);
+    expect(argsSeen[0]).toContain(join(root, ".agro", "scripts", "docker-compose.sh"));
+    expect(argsSeen[0].slice(-3)).toEqual(["up", "-d", "--no-build"]);
+    expect(argsSeen[0]).not.toContain("down");
+    expect(argsSeen[0]).not.toContain("-v");
+    expect(readJson(join(root, "agro.json"))).toEqual({ ...before, image: { mode: "image", ref: target } });
+    expect(readFileSync(join(root, ".env"), "utf8")).toBe("GH_TOKEN=keep-this\n");
+    expect(readFileSync(join(root, ".devcontainer", "docker-compose.yml"), "utf8")).toBe(composeBefore);
+    expect(existsSync(join(root, ".sandbox-upgrade.lock"))).toBe(false);
+  });
+
+  it("restores the old ref after a failed provision and keeps the old config", async () => {
+    registry();
+    const root = seed();
+    const before = readFileSync(join(root, "agro.json"), "utf8");
+    const envs: string[] = [];
+    const run: LifecycleRunner = (_cmd, _args, opts) => {
+      envs.push(opts.env?.AGRO_SANDBOX_IMAGE ?? "");
+      return { status: envs.length === 1 ? 42 : 0 };
+    };
+    const { err, io } = makeIo();
+    expect(await runSandboxUpgrade({ bin: "agro", name: "box", version: "0.13.0", run }, io)).toBe(1);
+    expect(envs).toEqual([target, previous]);
+    expect(err.join("")).toContain("provisioning failed");
+    expect(readFileSync(join(root, "agro.json"), "utf8")).toBe(before);
+    expect(existsSync(join(root, ".sandbox-upgrade.lock"))).toBe(false);
+  });
+
+  it("restores the old image and reports both persistence and restoration failures without changing config", async () => {
+    registry();
+    const root = seed();
+    const before = readFileSync(join(root, "agro.json"), "utf8");
+    const envs: string[] = [];
+    const { err, io } = makeIo();
+    const writeConfig = vi.fn(() => { throw new Error("disk full"); });
+    expect(await runSandboxUpgrade({ bin: "agro", name: "box", version: "0.13.0", writeConfig, run: (_cmd, _args, opts) => {
+      envs.push(opts.env?.AGRO_SANDBOX_IMAGE ?? "");
+      return { status: envs.length === 1 ? 0 : 17 };
+    } }, io)).toBe(1);
+    expect(writeConfig).toHaveBeenCalledOnce();
+    expect(envs).toEqual([target, previous]);
+    expect(err.join("")).toContain("config persistence failed (disk full); restoring previous image");
+    expect(err.join("")).toContain("restoration failed (exit 17)");
+    expect(readFileSync(join(root, "agro.json"), "utf8")).toBe(before);
+    expect(existsSync(join(root, ".sandbox-upgrade.lock"))).toBe(false);
+  });
+
+  it("reports failed restoration and uses the CLI-version image when no ref was pinned", async () => {
+    registry();
+    const root = seed("box", { mode: "image", pullPolicy: "always" });
+    const before = readFileSync(join(root, "agro.json"), "utf8");
+    const envs: string[] = [];
+    const { err, io } = makeIo();
+    expect(await runSandboxUpgrade({ bin: "agro", name: "box", version: "0.13.0", run: (_cmd, _args, opts) => {
+      envs.push(opts.env?.AGRO_SANDBOX_IMAGE ?? "");
+      return { status: 1 };
+    } }, io)).toBe(1);
+    expect(envs).toEqual([target, officialImageRef(AGRO_VERSION)]);
+    expect(err.join("")).toContain("restoration failed");
+    expect(readFileSync(join(root, "agro.json"), "utf8")).toBe(before);
+  });
+
+  it("refuses concurrent same-entry upgrades but permits another entry", async () => {
+    registry();
+    const root = seed();
+    seed("other");
+    const { err, io } = makeIo();
+    const envs: string[] = [];
+    let competing: Promise<number> | undefined;
+    let independent: Promise<number> | undefined;
+    const run: LifecycleRunner = (_cmd, _args, opts) => {
+      envs.push(opts.env?.AGRO_SANDBOX_IMAGE ?? "");
+      if (envs.length === 1) {
+        expect(existsSync(join(root, ".sandbox-upgrade.lock"))).toBe(true);
+        competing = runSandboxUpgrade({ bin: "agro", name: "box", version: "0.14.0", run }, io);
+        independent = runSandboxUpgrade({ bin: "agro", name: "other", version: "0.14.0", run }, io);
+      }
+      return { status: 0 };
+    };
+    expect(await runSandboxUpgrade({ bin: "agro", name: "box", version: "0.13.0", run }, io)).toBe(0);
+    expect(await competing).toBe(1);
+    expect(await independent).toBe(0);
+    expect(err.join("")).toContain("already in progress");
+    expect(existsSync(join(root, ".sandbox-upgrade.lock"))).toBe(false);
+    expect(existsSync(join(entryRoot("other"), ".sandbox-upgrade.lock"))).toBe(false);
+    expect(readJson(join(entryRoot("other"), "agro.json"))).toMatchObject({ image: { ref: officialImageRef("0.14.0") } });
+  });
+
+  it("rejects conflicting shell and entry dotenv image overrides without mutation", async () => {
+    registry();
+    const root = seed();
+    const before = readFileSync(join(root, "agro.json"), "utf8");
+    const { run, calls } = makeRunner();
+    vi.stubEnv("AGRO_SANDBOX_IMAGE", previous);
+    expect(await runSandboxUpgrade({ bin: "agro", name: "box", version: "0.13.0", run }, makeIo().io)).toBe(1);
+    vi.stubEnv("AGRO_SANDBOX_IMAGE", "");
+    writeFileSync(join(root, ".env"), `AGRO_SANDBOX_IMAGE=${previous}\n`);
+    expect(await runSandboxUpgrade({ bin: "agro", name: "box", version: "0.13.0", run }, makeIo().io)).toBe(1);
+    expect(readFileSync(join(root, "agro.json"), "utf8")).toBe(before);
+    expect(existsSync(join(root, ".sandbox-upgrade.lock"))).toBe(false);
+    expect(calls).toEqual([]);
+  });
+
+  it("refuses a pre-existing lock and cleans it only after its own run", async () => {
+    registry();
+    const root = seed();
+    const lock = join(root, ".sandbox-upgrade.lock");
+    writeFileSync(lock, "other process");
+    const { err, io } = makeIo();
+    expect(await runSandboxUpgrade({ bin: "agro", name: "box", version: "0.13.0", run: makeRunner().run }, io)).toBe(1);
+    expect(err.join("")).toContain(`upgrade already in progress for box; lock: ${lock}`);
+    expect(err.join("")).toContain("Confirm no upgrade process owns this entry before removing that lock and retrying");
+    expect(readFileSync(lock, "utf8")).toBe("other process");
+  });
+
+  it("refuses a fallback dotenv override and a sandbox-local execution target", async () => {
+    registry();
+    const root = seed();
+    writeFileSync(join(root, ".devcontainer", ".env"), `AGRO_SANDBOX_IMAGE=${previous}\n`);
+    const { run, calls } = makeRunner();
+    expect(await runSandboxUpgrade({ bin: "agro", name: "box", version: "0.13.0", run }, makeIo().io)).toBe(1);
+    vi.stubEnv("AGRO_EXECUTION_TARGET", "local");
+    const { err, io } = makeIo();
+    expect(await runSandboxUpgrade({ bin: "agro", name: "box", version: "0.13.0", run }, io)).toBe(1);
+    expect(err.join("")).toContain("host-only");
+    expect(calls).toEqual([]);
+  });
+});
 
 describe("agro sandbox install — runtime selection", () => {
   it.each(["agro", "agro"])(
@@ -904,6 +1079,92 @@ describe("agro sandbox list", () => {
   function registryRootPath(): string {
     return join(process.env.AGRO_HOME as string, "sandboxes");
   }
+
+  it("prints the exact empty-registry hint and no error", async () => {
+    const root = registry();
+    const { out, err, io } = makeIo();
+    const calls: RecordedCall[] = [];
+    const run: LifecycleRunner = (cmd, args) => {
+      calls.push({ cmd, args });
+      return { status: 0 };
+    };
+
+    expect(await runSandboxList({ bin: "agro", run }, io)).toBe(0);
+    expect(out).toEqual([
+      `no sandbox is registered in ${root} — create one with \`agro sandbox install docker\`\n`,
+    ]);
+    expect(err).toEqual([]);
+    expect(calls).toEqual([]);
+  });
+
+  it("prints an empty JSON array instead of the install hint", async () => {
+    registry();
+    const { out, err, io } = makeIo();
+    expect(await runSandboxList({ bin: "agro", json: true, run: makeRunner().run }, io)).toBe(0);
+    expect(out).toEqual(["[]\n"]);
+    expect(err).toEqual([]);
+  });
+
+  it("prints exact aligned text rows and probes every entry in name order", async () => {
+    registry();
+    seed("alpha", { checkout: "/srv/alpha" });
+    seed("longer-name", { repo: "/srv/legacy" });
+    seed("zeta");
+    const calls: RecordedCall[] = [];
+    const run: LifecycleRunner = (cmd, args) => {
+      calls.push({ cmd, args: [...args] });
+      return { status: 0, stdout: args.includes("alpha") ? "running\n" : "exited\n" };
+    };
+    const { out, err, io } = makeIo();
+
+    expect(await runSandboxList({ bin: "agro", run }, io)).toBe(0);
+    expect(out.join("")).toBe(
+      "alpha        docker  ready    /srv/alpha\n" +
+        "longer-name  docker  stopped  /srv/legacy\n" +
+        "zeta         docker  stopped  -\n",
+    );
+    expect(err).toEqual([]);
+    expect(calls).toEqual(["alpha", "longer-name", "zeta"].map((name) => ({
+      cmd: "docker",
+      args: ["inspect", "-f", "{{.State.Status}}", name],
+    })));
+  });
+
+  it("prints exact ordered JSON fields, sorted rows and the legacy repo alias", async () => {
+    registry();
+    seed("zeta");
+    seed("alpha", { checkout: "/srv/current", repo: "/srv/old" });
+    seed("beta", { repo: "/srv/legacy" });
+    const run: LifecycleRunner = (_cmd, args) => ({
+      status: 0,
+      stdout: args.includes("alpha") ? "running\n" : "exited\n",
+    });
+    const { out, err, io } = makeIo();
+
+    expect(await runSandboxList({ bin: "agro", json: true, run }, io)).toBe(0);
+    expect(out.join("")).toBe(`${JSON.stringify([
+      { name: "alpha", runtime: "docker", checkout: "/srv/current", repo: "/srv/current", status: "ready" },
+      { name: "beta", runtime: "docker", checkout: "/srv/legacy", repo: "/srv/legacy", status: "stopped" },
+      { name: "zeta", runtime: "docker", checkout: "-", repo: "-", status: "stopped" },
+    ], null, 2)}\n`);
+    expect(err).toEqual([]);
+  });
+
+  it("maps a failed status probe to absent without failing the list or writing stderr", async () => {
+    registry();
+    seed("alpha");
+    const calls: RecordedCall[] = [];
+    const run: LifecycleRunner = (cmd, args) => {
+      calls.push({ cmd, args: [...args] });
+      return { status: 1, stderr: "Error: No such object: alpha\n" };
+    };
+    const { out, err, io } = makeIo();
+
+    expect(await runSandboxList({ bin: "agro", run }, io)).toBe(0);
+    expect(out).toEqual(["alpha  docker  absent  -\n"]);
+    expect(err).toEqual([]);
+    expect(calls).toEqual([{ cmd: "docker", args: ["inspect", "-f", "{{.State.Status}}", "alpha"] }]);
+  });
 
   it("prints one row per entry with runtime, status and repo", async () => {
     registry();
