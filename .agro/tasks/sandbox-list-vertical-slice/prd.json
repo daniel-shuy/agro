@@ -39,8 +39,9 @@
       ],
       "priority": 2,
       "dependsOn": ["US-001"],
-      "passes": false,
-      "notes": "",
+      "passes": true,
+      "commit": "a7e7f15d",
+      "notes": "Executed: inspected integrated diff; cli.ts retains command selection, sandbox-list.ts owns status and rendering, sandbox.ts re-exports one implementation and retains install. Executed: targeted tests (0, 110 passed) without changed test assertions; pnpm run typecheck (0); pnpm run build:harness (0). Reasoned: source imports still use registry.ts, agro-config.ts, and resolveExecutionTarget; no second registry or execution implementation exists.",
       "files": [
         ".agro/cli/src/cli.ts",
         ".agro/cli/src/commands/sandbox.ts",
