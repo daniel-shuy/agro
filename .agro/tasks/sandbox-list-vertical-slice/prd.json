@@ -47,6 +47,26 @@
         ".agro/cli/src/commands/sandbox.ts",
         ".agro/cli/src/commands/sandbox-list.ts"
       ]
+    },
+    {
+      "id": "US-003",
+      "title": "Give sandbox commands one controller",
+      "description": "As a CLI maintainer, I want a sandbox command controller so that sandbox routing stays outside `cli.ts`.",
+      "acceptanceCriteria": [
+        "A sandbox controller owns sandbox argument parsing, sandbox help, and dispatch to install or list.",
+        "`cli.ts` selects `sandbox` and calls the controller without inspecting its subcommand or arguments.",
+        "Existing exports of `parseSandboxArgs` and `printSandboxHelp` remain available to current callers.",
+        "Sandbox install and list behavior, including error output, help output, and exit codes, stays unchanged.",
+        "The full test suite, typecheck, and CLI build exit with code 0."
+      ],
+      "priority": 3,
+      "dependsOn": ["US-002"],
+      "passes": false,
+      "notes": "",
+      "files": [
+        ".agro/cli/src/cli.ts",
+        ".agro/cli/src/commands/sandbox-controller.ts"
+      ]
     }
   ]
 }
