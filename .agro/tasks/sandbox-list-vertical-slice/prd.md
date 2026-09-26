@@ -34,7 +34,7 @@ Status: DRAFT
 
 **Acceptance Criteria:**
 
-- [ ] A sandbox controller owns sandbox argument parsing, sandbox help, and dispatch to install or list.
+- [ ] `.agro/cli/src/controllers/sandbox.ts` owns sandbox argument parsing, sandbox help, and dispatch to install or list.
 - [ ] `cli.ts` selects `sandbox` and calls the controller without inspecting its subcommand or arguments.
 - [ ] Existing exports of `parseSandboxArgs` and `printSandboxHelp` remain available to current callers.
 - [ ] Sandbox install and list behavior, including error output, help output, and exit codes, stays unchanged.
@@ -42,7 +42,7 @@ Status: DRAFT
 
 ## Summary
 
-The current `.agro/cli/src/cli.ts` parses `sandbox` arguments and dispatches `sandbox list`. The current `.agro/cli/src/commands/sandbox.ts` loads registry entries, reads their config, checks execution status, and renders text or JSON. Existing tests in `.agro/cli/src/__tests__/sandbox.test.ts` cover text and JSON rows. Extend those tests before moving production code. Keep the CLI contract unchanged. The operator also requires a sandbox controller for the command group. The controller owns sandbox parsing, help, and dispatch. The task does not prescribe a global layer layout.
+The current `.agro/cli/src/cli.ts` parses `sandbox` arguments and dispatches `sandbox list`. The current `.agro/cli/src/commands/sandbox.ts` loads registry entries, reads their config, checks execution status, and renders text or JSON. Existing tests in `.agro/cli/src/__tests__/sandbox.test.ts` cover text and JSON rows. Extend those tests before moving production code. Keep the CLI contract unchanged. The operator requires a `controllers/` directory in the CLI. The sandbox controller owns sandbox parsing, help, and dispatch. The task does not prescribe a global layer layout.
 
 ## Key Integration Points
 
@@ -51,7 +51,7 @@ The current `.agro/cli/src/cli.ts` parses `sandbox` arguments and dispatches `sa
 | `.agro/cli/src/cli.ts` | `parseSandboxArgs`, `main` | Preserve parsing and top-level selection; remove list-specific dispatch from the entry point. |
 | `.agro/cli/src/commands/sandbox.ts` | `runSandboxList`, `runSandboxInstall` | Move list behavior; keep install behavior in place. |
 | `.agro/cli/src/commands/sandbox-list.ts` | `runSandboxList` | Own list execution and rendering after extraction. |
-| `.agro/cli/src/commands/sandbox-controller.ts` | `parseSandboxArgs`, `printSandboxHelp`, `runSandboxCommand` | Own sandbox command parsing, help, and dispatch. |
+| `.agro/cli/src/controllers/sandbox.ts` | `parseSandboxArgs`, `printSandboxHelp`, `runSandboxCommand` | Own sandbox command parsing, help, and dispatch. |
 | `.agro/cli/src/lib/registry.ts` | `listEntries`, `entryRoot`, `registryRoot` | Keep registry reads in the existing source of truth. |
 | `.agro/cli/src/lib/execution/target.ts` | `ExecutionTarget.status` | Keep status probes behind the existing execution boundary. |
 | `.agro/cli/src/__tests__/sandbox.test.ts` | `agro sandbox list` | Lock behavior before extraction. |
@@ -62,7 +62,7 @@ The current `.agro/cli/src/cli.ts` parses `sandbox` arguments and dispatches `sa
 |---|---|---|
 | `agro sandbox list [--json]` | Internal only | Preserve arguments, help, output, and exit codes. |
 | `.agro/cli/src/commands/sandbox-list.ts` | New internal module | Establish a focused list operation. |
-| `.agro/cli/src/commands/sandbox-controller.ts` | New internal module | Own sandbox command parsing, help, and dispatch. |
+| `.agro/cli/src/controllers/sandbox.ts` | New internal module | Own sandbox command parsing, help, and dispatch. |
 
 ## Storage
 
