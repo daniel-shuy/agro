@@ -1,5 +1,6 @@
 import { runSandboxInstall, type SandboxIO } from "../commands/sandbox.js";
 import { runSandboxList } from "../commands/sandbox-list.js";
+import { runSandboxUpgrade } from "../services/sandbox-upgrade.js";
 import { AGRO_PRODUCT, stateNames } from "../lib/product.js";
 import { DEFAULT_NAME_PREFIX } from "../lib/registry.js";
 import { RUNTIME_CATALOG } from "../lib/runtimes/catalog.js";
@@ -260,8 +261,7 @@ export async function runSandboxCommand(rest: string[], bin: string): Promise<nu
   };
   if (a.subcommand === "list") return await runSandboxList({ bin, json: a.json }, io);
   if (a.subcommand === "upgrade") {
-    io.stderr(`${bin} sandbox upgrade: not available yet\n`);
-    return 1;
+    return await runSandboxUpgrade({ bin, name: a.name as string, version: a.version as string }, io);
   }
   return await runSandboxInstall(
     {
