@@ -103,8 +103,9 @@
       ],
       "priority": 5,
       "dependsOn": ["US-004"],
-      "passes": false,
-      "notes": "",
+      "passes": true,
+      "commit": "1c955b6b",
+      "notes": "Executed: injected-runner tests for absent/build entries, candidate image before config write, unchanged volume/mount/checkout/secrets/config, failed start and restoration, same-entry lock and different-entry operation, shell/dotenv override refusal (0). Executed: persistence-failure test with forced write error and failed restoration, config unchanged (0; repair c419c077). Integrated targeted sandbox/lifecycle tests (0, 186 passed); pnpm run typecheck (0); pnpm run build:harness (0).",
       "files": [
         ".agro/cli/src/services/sandbox-upgrade.ts",
         ".agro/cli/src/controllers/sandbox.ts",
