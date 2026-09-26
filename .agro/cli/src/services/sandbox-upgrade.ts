@@ -4,8 +4,8 @@ import { agroConfigPath, readAgroConfig, writeAgroConfig } from "../lib/agro-con
 import { runningInsideSandbox } from "../lib/execution/index.js";
 import { spawnRunner, type LifecycleRunner } from "../lib/execution/runner.js";
 import { entryRoot } from "../lib/registry.js";
-import { AGRO_VERSION, officialImageRef, parseReleaseVersion } from "../lib/version.js";
-import { runSandbox, type LifecycleIO } from "../commands/lifecycle.js";
+import { officialImageRef, parseReleaseVersion } from "../lib/version.js";
+import { configuredContainerName, DEFAULT_CONTAINER_NAME, runSandbox, type LifecycleIO } from "../commands/lifecycle.js";
 
 export interface SandboxUpgradeOptions {
   bin: string;
@@ -85,6 +85,16 @@ export async function runSandboxUpgrade(opts: SandboxUpgradeOptions, io: Lifecyc
       return 1;
     }
     const run = opts.run ?? spawnRunner;
+    let priorRef = config.image.ref;
+    if (!priorRef) {
+      const name = configuredContainerName(root) ?? DEFAULT_CONTAINER_NAME;
+      const inspected = run("docker", ["inspect", "-f", "{{.Config.Image}}", name], { stdio: "capture" });
+      priorRef = inspected.status === 0 && !inspected.error ? inspected.stdout?.trim() : undefined;
+      if (!priorRef) {
+        io.stderr(`${prefix} cannot determine previous image for ${name}; no changes made\n`);
+        return 1;
+      }
+    }
     const apply = (ref: string): Promise<number> => runSandbox({ bin: opts.bin, cwd: root, imageRef: ref, run }, io);
     let failure: string | undefined;
     try {
@@ -104,7 +114,6 @@ export async function runSandboxUpgrade(opts: SandboxUpgradeOptions, io: Lifecyc
       failure = `provisioning failed (${failure})`;
     }
     io.stderr(`${prefix} ${failure}; restoring previous image\n`);
-    const priorRef = config.image.ref || officialImageRef(AGRO_VERSION);
     try {
       const code = await apply(priorRef);
       if (code !== 0) io.stderr(`${prefix} restoration failed (exit ${code})\n`);
