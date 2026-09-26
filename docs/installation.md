@@ -271,6 +271,32 @@ To use the desktop:
 
 The desktop install changes no SSH firewall rule and sets no password.
 
+On the host, `agent-browser` installs a pinned release binary into `~/.local/bin`
+and never calls the operating system package manager. The installer does not download a
+browser. After the binary lands, the installer looks for an existing
+Chromium-family browser in this order: `AGENT_BROWSER_EXECUTABLE_PATH`,
+`google-chrome`, `google-chrome-stable`, `chromium`, `chromium-browser`,
+`brave-browser`, `microsoft-edge`. When none is present the install exits
+nonzero and names the remedy. Set the browser explicitly with:
+
+```bash
+export AGENT_BROWSER_EXECUTABLE_PATH=/path/to/chrome
+```
+
+agent-browser drives Chromium over CDP and Safari over WebDriver. Firefox is not
+a supported target. In the sandbox, the behavior stays the same: `agro tool install
+agent-browser` downloads Chrome for Testing and the browser libraries that Chrome needs,
+which is why that path asks to confirm about 1 GB first.
+
+Installing `tailscale` places the `tailscale` and `tailscaled` binaries in
+`~/.local/bin` and nothing more. It starts no daemon and joins no tailnet.
+Networking activates only when a human starts `tailscaled` in
+userspace-networking mode and runs `tailscale up` interactively — see
+[Connecting → Mobile access over Tailscale](connecting.md#mobile-access-over-tailscale).
+Its node identity and daemon state live in `~/.tailscale`, inside the single
+`/home/sandbox` mount, so the node does not re-authenticate on every container
+recreate.
+
 #### Remove a root-level tool
 
 `agro tool uninstall docker-engine` and `agro tool uninstall desktop` exit 1 and
@@ -354,32 +380,6 @@ To remove `desktop`:
    sudo rm -f /etc/apt/sources.list.d/tailscale.list /usr/share/keyrings/tailscale-archive-keyring.gpg
    sudo apt-get update
    ```
-
-On the host, `agent-browser` installs a pinned release binary into `~/.local/bin`
-and never calls the operating system package manager. The installer does not download a
-browser. After the binary lands, the installer looks for an existing
-Chromium-family browser in this order: `AGENT_BROWSER_EXECUTABLE_PATH`,
-`google-chrome`, `google-chrome-stable`, `chromium`, `chromium-browser`,
-`brave-browser`, `microsoft-edge`. When none is present the install exits
-nonzero and names the remedy. Set the browser explicitly with:
-
-```bash
-export AGENT_BROWSER_EXECUTABLE_PATH=/path/to/chrome
-```
-
-agent-browser drives Chromium over CDP and Safari over WebDriver. Firefox is not
-a supported target. In the sandbox, the behavior stays the same: `agro tool install
-agent-browser` downloads Chrome for Testing and the browser libraries that Chrome needs,
-which is why that path asks to confirm about 1 GB first.
-
-Installing `tailscale` places the `tailscale` and `tailscaled` binaries in
-`~/.local/bin` and nothing more. It starts no daemon and joins no tailnet.
-Networking activates only when a human starts `tailscaled` in
-userspace-networking mode and runs `tailscale up` interactively — see
-[Connecting → Mobile access over Tailscale](connecting.md#mobile-access-over-tailscale).
-Its node identity and daemon state live in `~/.tailscale`, inside the single
-`/home/sandbox` mount, so the node does not re-authenticate on every container
-recreate.
 
 ### Runtimes & package managers
 
