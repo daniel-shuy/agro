@@ -16,12 +16,13 @@
         "`pnpm build:harness`, `pnpm test`, and `pnpm typecheck` exit 0."
       ],
       "priority": 1,
-      "passes": false,
-      "notes": "",
+      "passes": true,
+      "notes": "Commit 3a0c49ac, fast-forwarded onto the task branch. AC1 executed: grep -n on the headings gives agent-browser 274, tailscale 291, removal heading 300, Runtimes 384. AC2 executed: sed -n 380,385p shows the removal code block, one blank line, then ### Runtimes & package managers. AC3 executed: sorted diff against origin/development printed nothing, exit 0. AC4 executed: grep -c heading = 1, grep -c link = 1; the heading text is unchanged, so the anchor still resolves. AC5 executed on the task branch: pnpm build:harness exit 0, pnpm test exit 0 (1714 tests), pnpm typecheck exit 0.",
       "dependsOn": [],
       "files": [
         "docs/installation.md"
-      ]
+      ],
+      "commit": "3a0c49ac"
     }
   ]
 }

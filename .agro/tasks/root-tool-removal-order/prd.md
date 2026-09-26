@@ -12,11 +12,11 @@ Issue: mifunedev/agro#1205. Epic: mifunedev/agro#1206.
 
 **Acceptance Criteria:**
 
-- [ ] In `docs/installation.md`, the `agent-browser` host install paragraphs and the `tailscale` paragraph come before the `#### Remove a root-level tool` heading.
-- [ ] The `#### Remove a root-level tool` section ends immediately before the `### Runtimes & package managers` heading.
-- [ ] `diff <(git show origin/development:docs/installation.md | sort) <(sort docs/installation.md)` prints nothing. The move adds no line and removes no line.
-- [ ] `docs/installation.md` has exactly one `#### Remove a root-level tool` heading, and the link `[Remove a root-level tool](#remove-a-root-level-tool)` still points to it.
-- [ ] `pnpm build:harness`, `pnpm test`, and `pnpm typecheck` exit 0.
+- [x] In `docs/installation.md`, the `agent-browser` host install paragraphs and the `tailscale` paragraph come before the `#### Remove a root-level tool` heading.
+- [x] The `#### Remove a root-level tool` section ends immediately before the `### Runtimes & package managers` heading.
+- [x] `diff <(git show origin/development:docs/installation.md | sort) <(sort docs/installation.md)` prints nothing. The move adds no line and removes no line.
+- [x] `docs/installation.md` has exactly one `#### Remove a root-level tool` heading, and the link `[Remove a root-level tool](#remove-a-root-level-tool)` still points to it.
+- [x] `pnpm build:harness`, `pnpm test`, and `pnpm typecheck` exit 0.
 
 ## Summary
 
@@ -82,10 +82,10 @@ None.
 
 ## Acceptance Criteria
 
-- [ ] US-001 has `passes: true` in `prd.json`.
-- [ ] CI is green on the PR.
-- [ ] The PR body closes #1205.
+- [x] US-001 has `passes: true` in `prd.json`.
+- [x] CI is green on the PR.
+- [x] The PR body closes #1205.
 
 ## Lessons
 
-Filled by the advisor before undraft.
+None.
