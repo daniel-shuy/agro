@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "project": "agro",
+  "branchName": "bug/1204-boot-smoke-test-timeout",
+  "description": "Give the boot smoke test suites a 30 s time budget above the script's bounded waits, so that a slow CI runner does not time out a correct case.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Set a time budget on the boot smoke test suites",
+      "description": "As a maintainer, I want a test budget above the longest script wait, so that a slow CI runner passes a correct case.",
+      "acceptanceCriteria": [
+        "`.agro/scripts/__tests__/sandbox-boot-smoke.test.ts` declares one named constant for the test time budget, with the value `30_000`.",
+        "Both `describe` blocks in the file pass the constant as their `timeout` option.",
+        "The case \"fails when systemd does not recover the scheduler after SIGKILL\" still asserts exit status 1 and the stderr text `did not recover the scheduler after SIGKILL`.",
+        "With the `kill -9` stub changed to always write `4242`, the case above fails. The advisor runs this mutation check and reverts the stub.",
+        "`pnpm exec vitest run .agro/scripts/__tests__/sandbox-boot-smoke.test.ts` exits 0 on 20 consecutive runs.",
+        "`pnpm build:harness`, `pnpm test`, and `pnpm typecheck` exit 0."
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [],
+      "files": [
+        ".agro/scripts/__tests__/sandbox-boot-smoke.test.ts"
+      ]
+    }
+  ]
+}
