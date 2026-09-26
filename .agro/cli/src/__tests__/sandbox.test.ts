@@ -905,6 +905,92 @@ describe("agro sandbox list", () => {
     return join(process.env.AGRO_HOME as string, "sandboxes");
   }
 
+  it("prints the exact empty-registry hint and no error", async () => {
+    const root = registry();
+    const { out, err, io } = makeIo();
+    const calls: RecordedCall[] = [];
+    const run: LifecycleRunner = (cmd, args) => {
+      calls.push({ cmd, args });
+      return { status: 0 };
+    };
+
+    expect(await runSandboxList({ bin: "agro", run }, io)).toBe(0);
+    expect(out).toEqual([
+      `no sandbox is registered in ${root} — create one with \`agro sandbox install docker\`\n`,
+    ]);
+    expect(err).toEqual([]);
+    expect(calls).toEqual([]);
+  });
+
+  it("prints an empty JSON array instead of the install hint", async () => {
+    registry();
+    const { out, err, io } = makeIo();
+    expect(await runSandboxList({ bin: "agro", json: true, run: makeRunner().run }, io)).toBe(0);
+    expect(out).toEqual(["[]\n"]);
+    expect(err).toEqual([]);
+  });
+
+  it("prints exact aligned text rows and probes every entry in name order", async () => {
+    registry();
+    seed("alpha", { checkout: "/srv/alpha" });
+    seed("longer-name", { repo: "/srv/legacy" });
+    seed("zeta");
+    const calls: RecordedCall[] = [];
+    const run: LifecycleRunner = (cmd, args) => {
+      calls.push({ cmd, args: [...args] });
+      return { status: 0, stdout: args.includes("alpha") ? "running\n" : "exited\n" };
+    };
+    const { out, err, io } = makeIo();
+
+    expect(await runSandboxList({ bin: "agro", run }, io)).toBe(0);
+    expect(out.join("")).toBe(
+      "alpha        docker  ready    /srv/alpha\n" +
+        "longer-name  docker  stopped  /srv/legacy\n" +
+        "zeta         docker  stopped  -\n",
+    );
+    expect(err).toEqual([]);
+    expect(calls).toEqual(["alpha", "longer-name", "zeta"].map((name) => ({
+      cmd: "docker",
+      args: ["inspect", "-f", "{{.State.Status}}", name],
+    })));
+  });
+
+  it("prints exact ordered JSON fields, sorted rows and the legacy repo alias", async () => {
+    registry();
+    seed("zeta");
+    seed("alpha", { checkout: "/srv/current", repo: "/srv/old" });
+    seed("beta", { repo: "/srv/legacy" });
+    const run: LifecycleRunner = (_cmd, args) => ({
+      status: 0,
+      stdout: args.includes("alpha") ? "running\n" : "exited\n",
+    });
+    const { out, err, io } = makeIo();
+
+    expect(await runSandboxList({ bin: "agro", json: true, run }, io)).toBe(0);
+    expect(out.join("")).toBe(`${JSON.stringify([
+      { name: "alpha", runtime: "docker", checkout: "/srv/current", repo: "/srv/current", status: "ready" },
+      { name: "beta", runtime: "docker", checkout: "/srv/legacy", repo: "/srv/legacy", status: "stopped" },
+      { name: "zeta", runtime: "docker", checkout: "-", repo: "-", status: "stopped" },
+    ], null, 2)}\n`);
+    expect(err).toEqual([]);
+  });
+
+  it("maps a failed status probe to absent without failing the list or writing stderr", async () => {
+    registry();
+    seed("alpha");
+    const calls: RecordedCall[] = [];
+    const run: LifecycleRunner = (cmd, args) => {
+      calls.push({ cmd, args: [...args] });
+      return { status: 1, stderr: "Error: No such object: alpha\n" };
+    };
+    const { out, err, io } = makeIo();
+
+    expect(await runSandboxList({ bin: "agro", run }, io)).toBe(0);
+    expect(out).toEqual(["alpha  docker  absent  -\n"]);
+    expect(err).toEqual([]);
+    expect(calls).toEqual([{ cmd: "docker", args: ["inspect", "-f", "{{.State.Status}}", "alpha"] }]);
+  });
+
   it("prints one row per entry with runtime, status and repo", async () => {
     registry();
     seed("alpha");

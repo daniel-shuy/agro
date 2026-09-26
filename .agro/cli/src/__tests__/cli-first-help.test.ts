@@ -15,7 +15,7 @@ vi.mock("../cli.js", async (importOriginal) => {
   return mod;
 });
 
-const { parseSelfUpgradeArgs, parseVendorArgs, printAgroHelp, printSelfUpgradeHelp, printVendorHelp } =
+const { parseSelfUpgradeArgs, parseVendorArgs, printAgroHelp, printSandboxHelp, printSelfUpgradeHelp, printVendorHelp } =
   await import("../cli.js");
 
 function captureStdout(fn: () => void): string {
@@ -44,6 +44,12 @@ describe("cli-first help — the single agro identity", () => {
     const text = captureStdout(() => printVendorHelp("agro"));
     expect(text).toContain("Vendor or upgrade the .agro/ control plane");
     expect(text).toContain("--from-remote [--ref <ref>]");
+  });
+
+  it("sandbox help documents list with --json on its own usage line", () => {
+    const text = captureStdout(() => printSandboxHelp("agro"));
+    expect(text).toMatch(/^agro sandbox — Create and list sandboxes\n/);
+    expect(text).toMatch(/^  agro sandbox list \[--json\]$/m);
   });
 });
 
@@ -154,6 +160,54 @@ describe.skipIf(!ESBUILD_AVAILABLE)(
         expect(both.stderr).toContain("--version");
         expect(both.stderr).toContain("--image=<ref>");
         expect(existsSync(join(home, "sandboxes"))).toBe(false);
+      } finally {
+        rmSync(home, { recursive: true, force: true });
+      }
+    });
+
+    it("sandbox list help exits successfully without querying the registry", () => {
+      for (const flag of ["--help", "-h"]) {
+        const result = run(AGRO_JS, ["sandbox", "list", flag]);
+        expect(result.code).toBe(0);
+        expect(result.stdout).toMatch(/^agro sandbox — Create and list sandboxes\n/);
+        expect(result.stdout).toMatch(/^  agro sandbox list \[--json\]$/m);
+        expect(result.stderr).toBe("");
+      }
+    });
+
+    it("sandbox list and --json return exact empty-registry output", () => {
+      const home = mkdtempSync(join(tmpdir(), "agro-list-empty-"));
+      try {
+        expect(run(AGRO_JS, ["sandbox", "list", "--json"], { AGRO_HOME: home })).toEqual({
+          code: 0,
+          stdout: "[]\n",
+          stderr: "",
+        });
+        expect(run(AGRO_JS, ["sandbox", "list"], { AGRO_HOME: home })).toEqual({
+          code: 0,
+          stdout: `no sandbox is registered in ${join(home, "sandboxes")} — create one with \`agro sandbox install docker\`\n`,
+          stderr: "",
+        });
+      } finally {
+        rmSync(home, { recursive: true, force: true });
+      }
+    });
+
+    it("sandbox list rejects unexpected positionals and unknown flags with exact exit and stderr", () => {
+      const home = mkdtempSync(join(tmpdir(), "agro-list-invalid-"));
+      try {
+        for (const [tail, error] of [
+          [["extra"], 'agro sandbox list: unexpected argument "extra"\n'],
+          [["--json", "extra"], 'agro sandbox list: unexpected argument "extra"\n'],
+          [["--unknown"], 'agro sandbox list: unknown flag "--unknown"\n'],
+          [["--json", "--unknown"], 'agro sandbox list: unknown flag "--unknown"\n'],
+        ] as const) {
+          expect(run(AGRO_JS, ["sandbox", "list", ...tail], { AGRO_HOME: home })).toEqual({
+            code: 1,
+            stdout: "",
+            stderr: error,
+          });
+        }
       } finally {
         rmSync(home, { recursive: true, force: true });
       }

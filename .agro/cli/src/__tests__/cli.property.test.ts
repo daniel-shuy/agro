@@ -17,6 +17,7 @@ const {
   parseConfigArgs,
   parseDestroyArgs,
   parseSecretArgs,
+  parseSandboxArgs,
 } = await import("../cli.js");
 
 const stringOrUndefined = fc.oneof(fc.string(), fc.constant(undefined));
@@ -79,6 +80,55 @@ describe("parseDestroyArgs — property tests", () => {
         expect(rest.every((t) => t === "--yes" || t === parsed.args.name)).toBe(true);
       }),
     );
+  });
+});
+
+describe("parseSandboxArgs — sandbox list contract", () => {
+  const listArgs = {
+    help: false,
+    subcommand: "list",
+    yes: false,
+    image: false,
+    noBuild: false,
+    printArgv: false,
+    json: false,
+  };
+
+  it.each([
+    [[], listArgs],
+    [["--json"], { ...listArgs, json: true }],
+    [["--json", "--json"], { ...listArgs, json: true }],
+    [["--yes", "--json"], { ...listArgs, yes: true, json: true }],
+  ])("parses list arguments %j without changing the command", (tail, args) => {
+    expect(parseSandboxArgs(["list", ...tail], "agro")).toEqual({ ok: true, args });
+  });
+
+  it.each(["--help", "-h"])("accepts leading %s and skips trailing tokens", (flag) => {
+    expect(parseSandboxArgs(["list", flag, "--unknown"], "agro")).toEqual({
+      ok: true,
+      args: { ...listArgs, help: true },
+    });
+  });
+
+  it.each([
+    [["extra"], 'agro sandbox list: unexpected argument "extra"'],
+    [["--json", "extra"], 'agro sandbox list: unexpected argument "extra"'],
+    [["--unknown"], 'agro sandbox list: unknown flag "--unknown"'],
+    [["--json", "--unknown"], 'agro sandbox list: unknown flag "--unknown"'],
+    [["--json", "--help"], 'agro sandbox list: unknown flag "--help"'],
+  ])("rejects list arguments %j with the exact diagnostic", (tail, error) => {
+    expect(parseSandboxArgs(["list", ...tail], "agro")).toEqual({ ok: false, error });
+  });
+
+  it("never accepts an unexpected positional, including after --json", () => {
+    fc.assert(fc.property(fc.string({ minLength: 1 }).filter((value) =>
+      !value.startsWith("-") && !Object.prototype.hasOwnProperty.call(Object.prototype, value)
+    ), (value) => {
+      expect(parseSandboxArgs(["list", "--json", value], "agro")).toEqual({
+        ok: false,
+        error: `agro sandbox list: unexpected argument "${value}"`,
+      });
+    }));
   });
 });
 
