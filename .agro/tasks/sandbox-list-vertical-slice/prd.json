@@ -16,8 +16,9 @@
         "Typecheck passes"
       ],
       "priority": 1,
-      "passes": false,
-      "notes": "",
+      "passes": true,
+      "commit": "43906957",
+      "notes": "Executed: empty, text, JSON and failed-probe tests; argument/help tests; exact output, field order, exit-code and stderr assertions: pnpm exec vitest run .agro/cli/src/__tests__/sandbox.test.ts .agro/cli/src/__tests__/cli.property.test.ts .agro/cli/src/__tests__/cli-first-help.test.ts (0, 110 passed). Executed before production changes: same command (0). Typecheck: pnpm run typecheck (0).",
       "files": [
         ".agro/cli/src/__tests__/sandbox.test.ts",
         ".agro/cli/src/__tests__/cli.property.test.ts",
