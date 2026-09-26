@@ -35,11 +35,8 @@ import {
   type ComposeVerb,
   type LifecycleIO,
 } from "./commands/lifecycle.js";
-import {
-  runSandboxInstall,
-  runSandboxList,
-  type SandboxIO,
-} from "./commands/sandbox.js";
+import { runSandboxInstall, type SandboxIO } from "./commands/sandbox.js";
+import { runSandboxList } from "./commands/sandbox-list.js";
 import {
   runHarnessInstall,
   runHarnessList,
