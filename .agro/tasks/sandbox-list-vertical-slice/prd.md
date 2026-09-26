@@ -75,9 +75,20 @@ Status: DRAFT
 - [ ] `.agro/cli/README.md` documents the command and distinguishes it from CLI self-upgrade.
 - [ ] Typecheck, full tests, build, and applicable eval probes exit with code 0.
 
+### US-007: Retire the tracked plans directory
+
+**Description:** As a maintainer, I want the retired `.agro/plans/` directory absent from the repository so that task plans have one canonical home.
+
+**Acceptance Criteria:**
+
+- [ ] `git ls-files .agro/plans` returns no tracked paths.
+- [ ] The task worktree has no `.agro/plans/` directory after the tracked archive is removed.
+- [ ] The `/prd` path contract probe passes, and no live procedure gains a dependency on `.agro/plans/`.
+- [ ] Ignored local drafts in other worktrees remain untouched by the PR.
+
 ## Summary
 
-The current `.agro/cli/src/cli.ts` parses `sandbox` arguments and dispatches `sandbox list`. The current `.agro/cli/src/commands/sandbox.ts` loads registry entries, reads their config, checks execution status, and renders text or JSON. Existing tests in `.agro/cli/src/__tests__/sandbox.test.ts` cover text and JSON rows. Extend those tests before moving production code. Keep the CLI contract unchanged. The operator requires a `controllers/` directory in the CLI. The sandbox controller owns sandbox parsing, help, and dispatch. The operator later approved an explicit, immediate sandbox image upgrade in this same PR. The new command uses the controller and a focused service without changing `agro update`.
+The current `.agro/cli/src/cli.ts` parses `sandbox` arguments and dispatches `sandbox list`. The current `.agro/cli/src/commands/sandbox.ts` loads registry entries, reads their config, checks execution status, and renders text or JSON. Existing tests in `.agro/cli/src/__tests__/sandbox.test.ts` cover text and JSON rows. Extend those tests before moving production code. Keep the CLI contract unchanged. The operator requires a `controllers/` directory in the CLI. The sandbox controller owns sandbox parsing, help, and dispatch. The operator later approved an explicit, immediate sandbox image upgrade in this same PR. The new command uses the controller and a focused service without changing `agro update`. The operator also requested removal of the retired tracked `.agro/plans/` archive from this PR.
 
 ## Key Integration Points
 
@@ -92,6 +103,7 @@ The current `.agro/cli/src/cli.ts` parses `sandbox` arguments and dispatches `sa
 | `.agro/cli/src/lib/registry.ts` | `listEntries`, `entryRoot`, `registryRoot` | Keep registry reads in the existing source of truth. |
 | `.agro/cli/src/lib/execution/target.ts` | `ExecutionTarget.status` | Keep status probes behind the existing execution boundary. |
 | `.agro/cli/src/__tests__/sandbox.test.ts` | `agro sandbox list` | Lock behavior before extraction. |
+| `.agro/plans/archive/2026-09-10/cli-first-release/plan.md` | Historical tracked plan | Delete the last tracked file under `.agro/plans/`. |
 
 ## Interface Integration Points
 
@@ -108,14 +120,14 @@ The sandbox registry remains under `${AGRO_HOME:-~/.agro}/sandboxes/`. The upgra
 
 ## Architectural Decisions
 
-- Keep the command workflow as the unit of organization. Do not add HTTP-style routes, controllers, or models to the CLI.
+- Keep the command workflow as the unit of organization. Do not add HTTP-style routes or standalone model classes to the CLI.
 - Keep one parser contract. If extraction moves `parseSandboxArgs`, preserve its install behavior and exported API; do not create a second parser for list.
 - Keep `cli.ts` responsible for selecting the top-level command. The sandbox controller owns sandbox parsing, help, and dispatch. Keep list formatting and status lookup in the focused list module.
 - Preserve current behavior even where the parser accepts flags that `sandbox list` does not use.
 - For upgrade, accept an explicit sandbox name and version only; refuse build-mode entries. Stage the candidate image before persisting `image.ref`.
 - Use the current Compose wrapper and `ExecutionTarget`. On failure, keep the prior config and attempt to restore the previous image.
 - Use `ImageSettings` in `lib/agro-config.ts` as the model and `lib/version.ts` for pure version functions. Put upgrade coordination in `services/sandbox-upgrade.ts`; do not add empty model or utility directories.
-- Run code and tests inside the sandbox. This task does not start a service or change host lifecycle behavior.
+- Run code and tests inside the sandbox. The upgrade uses the existing host lifecycle wrapper and does not start a persistent service.
 
 ## Test Plan (TDD)
 
@@ -126,6 +138,7 @@ The sandbox registry remains under `${AGRO_HOME:-~/.agro}/sandboxes/`. The upgra
 | `.agro/cli/src/__tests__/cli-first-help.test.ts` | `sandbox` help and list dispatch output | Public command behavior after extraction. |
 | `.agro/cli/src/__tests__/lifecycle.test.ts` | Sandbox install and list argument contracts; upgrade flags | Existing and new controller behavior. |
 | `.agro/cli/src/__tests__/sandbox.test.ts` | Success, failure, home preservation, and concurrent upgrade cases | Upgrade state and lifecycle behavior. |
+| `.agro/evals/probes/prd-output-path-contract.sh` | Existing path guard | Verify the canonical task plan location without editing the probe. |
 
 Add tests that detect output or dispatch changes; run the tests against the original code first. Then move the list code and rerun the same tests. Run `pnpm run typecheck` and `pnpm run build:harness` from the repository root.
 
@@ -135,12 +148,12 @@ Add tests that detect output or dispatch changes; run the tests against the orig
 - Reuse the registry and execution boundaries.
 - Delete moved code instead of keeping duplicate implementations.
 - Add no explanatory comments to tracked code.
-- Keep host and sandbox boundaries unchanged. The command works after a terminal disconnect and does not share mutable state between agents.
+- Keep host and sandbox boundaries unchanged. Use the per-entry lock to prevent conflicting upgrades.
 
 ## Out of Scope
 
 - Refactoring `sandbox install` behavior or other command families.
-- Adding application scaffolds, routes, controllers, models, services, or repositories.
+- Adding application scaffolds, HTTP routes, or unused model and repository abstractions.
 - Changing existing CLI flags, list output, or registry layout. Add only the approved upgrade command and matching documentation.
 - Adding dependencies or changing the packaged CLI build layout.
 
@@ -151,12 +164,13 @@ None.
 ## Acceptance Criteria
 
 - [ ] US-001 tests pass against the original implementation before the code move.
-- [ ] All six stories meet every listed criterion.
+- [ ] All seven stories meet every listed criterion.
+- [ ] `git ls-files .agro/plans` is empty in the task worktree.
 - [ ] An explicit sandbox image upgrade applies immediately without changing home storage or the CLI executable.
 - [ ] `pnpm run typecheck` exits with code 0 from the repository root.
 - [ ] `pnpm exec vitest run .agro/cli/src/__tests__/sandbox.test.ts .agro/cli/src/__tests__/cli.property.test.ts .agro/cli/src/__tests__/cli-first-help.test.ts` exits with code 0 from the repository root.
 - [ ] `pnpm run build:harness` exits with code 0 from the repository root.
-- [ ] `git diff` shows no change to public CLI output contracts or persisted data.
+- [ ] `git diff` shows existing install and list output unchanged; upgrade adds only the approved command and `image.ref` persistence.
 
 ## Lessons
 
