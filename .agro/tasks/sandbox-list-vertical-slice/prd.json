@@ -81,8 +81,9 @@
       ],
       "priority": 4,
       "dependsOn": ["US-003"],
-      "passes": false,
-      "notes": "",
+      "passes": true,
+      "commit": "75afd42a",
+      "notes": "Executed: parser tests failed before change and passed after; targeted lifecycle and sandbox tests (0, 177 passed); pnpm run typecheck (0). Reasoned: controller help names upgrade and previous update dispatch remains CLI-only; valid upgrade dispatch awaits US-005.",
       "files": [
         ".agro/cli/src/controllers/sandbox.ts",
         ".agro/cli/src/__tests__/lifecycle.test.ts"
