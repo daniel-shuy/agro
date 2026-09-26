@@ -128,8 +128,10 @@
       "notes": "",
       "files": [
         ".agro/cli/src/__tests__/cli-first-help.test.ts",
+        ".agro/cli/src/cli.ts",
         "docs/lifecycle-commands.md",
-        ".agro/cli/README.md"
+        ".agro/cli/README.md",
+        "CHANGELOG.md"
       ]
     }
   ]
