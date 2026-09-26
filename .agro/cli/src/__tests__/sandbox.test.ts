@@ -151,6 +151,25 @@ describe("agro sandbox upgrade", () => {
     expect(existsSync(join(root, ".sandbox-upgrade.lock"))).toBe(false);
   });
 
+  it("restores the old image and reports both persistence and restoration failures without changing config", async () => {
+    registry();
+    const root = seed();
+    const before = readFileSync(join(root, "agro.json"), "utf8");
+    const envs: string[] = [];
+    const { err, io } = makeIo();
+    const writeConfig = vi.fn(() => { throw new Error("disk full"); });
+    expect(await runSandboxUpgrade({ bin: "agro", name: "box", version: "0.13.0", writeConfig, run: (_cmd, _args, opts) => {
+      envs.push(opts.env?.AGRO_SANDBOX_IMAGE ?? "");
+      return { status: envs.length === 1 ? 0 : 17 };
+    } }, io)).toBe(1);
+    expect(writeConfig).toHaveBeenCalledOnce();
+    expect(envs).toEqual([target, previous]);
+    expect(err.join("")).toContain("config persistence failed (disk full); restoring previous image");
+    expect(err.join("")).toContain("restoration failed (exit 17)");
+    expect(readFileSync(join(root, "agro.json"), "utf8")).toBe(before);
+    expect(existsSync(join(root, ".sandbox-upgrade.lock"))).toBe(false);
+  });
+
   it("reports failed restoration and uses the CLI-version image when no ref was pinned", async () => {
     registry();
     const root = seed("box", { mode: "image", pullPolicy: "always" });

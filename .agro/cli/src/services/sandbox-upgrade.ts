@@ -12,6 +12,7 @@ export interface SandboxUpgradeOptions {
   name: string;
   version: string;
   run?: LifecycleRunner;
+  writeConfig?: typeof writeAgroConfig;
 }
 
 function errorMessage(error: unknown): string {
@@ -89,10 +90,16 @@ export async function runSandboxUpgrade(opts: SandboxUpgradeOptions, io: Lifecyc
       failure = errorMessage(error);
     }
     if (failure === undefined) {
-      writeAgroConfig(root, { ...config, image: { ...config.image, ref: imageRef } });
-      return 0;
+      try {
+        (opts.writeConfig ?? writeAgroConfig)(root, { ...config, image: { ...config.image, ref: imageRef } });
+        return 0;
+      } catch (error) {
+        failure = `config persistence failed (${errorMessage(error)})`;
+      }
+    } else {
+      failure = `provisioning failed (${failure})`;
     }
-    io.stderr(`${prefix} provisioning failed (${failure}); restoring previous image\n`);
+    io.stderr(`${prefix} ${failure}; restoring previous image\n`);
     const priorRef = config.image.ref || officialImageRef(AGRO_VERSION);
     try {
       const code = await apply(priorRef);
