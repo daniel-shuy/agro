@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "project": "AGRO CLI",
+  "branchName": "task/1208-sandbox-list-vertical-slice",
+  "description": "Preserve the sandbox list contract and extract one focused command slice without changing public behavior.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Lock the sandbox list contract",
+      "description": "As a CLI maintainer, I want tests for the `sandbox list` contract so that I can move its code without changing its behavior.",
+      "acceptanceCriteria": [
+        "Tests cover `sandbox list` with no entries, text rows, JSON rows, and a failed status probe.",
+        "Tests cover the current `sandbox list` argument and help behavior, including `--json`, unexpected positionals, and unknown flags.",
+        "Tests assert the exact JSON field names and order, text output, exit codes, and relevant stderr output.",
+        "The new tests pass against the original implementation before any production code moves.",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "",
+      "files": [
+        ".agro/cli/src/__tests__/sandbox.test.ts",
+        ".agro/cli/src/__tests__/cli.property.test.ts",
+        ".agro/cli/src/__tests__/cli-first-help.test.ts"
+      ]
+    },
+    {
+      "id": "US-002",
+      "title": "Isolate sandbox list without changing its contract",
+      "description": "As a CLI maintainer, I want a bounded `sandbox list` command slice so that later commands can follow a tested pattern.",
+      "acceptanceCriteria": [
+        "`cli.ts` retains top-level command selection but delegates `sandbox list` behavior to a focused module under `.agro/cli/src/commands/`.",
+        "The slice owns list-specific dispatch and output. `runSandboxInstall` remains in its current command module.",
+        "The slice reuses `listEntries`, `entryRoot`, configuration readers, and `ExecutionTarget`. It does not add a second registry or execution implementation.",
+        "The old `sandbox list` behavior does not remain as a second implementation in `sandbox.ts` or `cli.ts`.",
+        "Tests from US-001 pass without changed assertions after the move.",
+        "`pnpm run typecheck`, `pnpm exec vitest run .agro/cli/src/__tests__/sandbox.test.ts`, and `pnpm run build:harness` exit with code 0."
+      ],
+      "priority": 2,
+      "dependsOn": ["US-001"],
+      "passes": false,
+      "notes": "",
+      "files": [
+        ".agro/cli/src/cli.ts",
+        ".agro/cli/src/commands/sandbox.ts",
+        ".agro/cli/src/commands/sandbox-list.ts"
+      ]
+    }
+  ]
+}
