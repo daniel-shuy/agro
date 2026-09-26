@@ -68,6 +68,67 @@
         ".agro/cli/src/cli.ts",
         ".agro/cli/src/controllers/sandbox.ts"
       ]
+    },
+    {
+      "id": "US-004",
+      "title": "Select an explicit sandbox version",
+      "description": "As an operator, I want to name a sandbox and a release version so that an upgrade targets one known image.",
+      "acceptanceCriteria": [
+        "The sandbox parser accepts `upgrade <name> --version <X.Y.Z>` with a validated release version.",
+        "The parser supports the same leading `v` and prerelease format as `sandbox install --version`.",
+        "Missing or invalid versions, missing names, `--latest`, and extra arguments return non-zero with a diagnostic.",
+        "Sandbox help names the upgrade command; `agro update` retains its CLI-only behavior."
+      ],
+      "priority": 4,
+      "dependsOn": ["US-003"],
+      "passes": false,
+      "notes": "",
+      "files": [
+        ".agro/cli/src/controllers/sandbox.ts",
+        ".agro/cli/src/__tests__/lifecycle.test.ts"
+      ]
+    },
+    {
+      "id": "US-005",
+      "title": "Apply the image and preserve state",
+      "description": "As an operator, I want the selected image applied immediately so that the sandbox runs it without losing home data.",
+      "acceptanceCriteria": [
+        "The command refuses absent or build-mode entries without changing their config.",
+        "A successful command starts the selected image through the existing Compose wrapper, then writes `image.ref` to the registry entry.",
+        "The command preserves the home mount, named volumes, checkout, `.env`, and unrelated config fields; it never invokes `down -v`.",
+        "Failed provisioning retains the prior `image.ref`, attempts restoration, and reports restoration failure when restoration also fails.",
+        "Same-entry concurrent upgrades cannot apply conflicting versions; different entries can upgrade independently.",
+        "A conflicting `AGRO_SANDBOX_IMAGE` from the host shell or entry `.env` cannot silently replace the selected version."
+      ],
+      "priority": 5,
+      "dependsOn": ["US-004"],
+      "passes": false,
+      "notes": "",
+      "files": [
+        ".agro/cli/src/services/sandbox-upgrade.ts",
+        ".agro/cli/src/controllers/sandbox.ts",
+        ".agro/cli/src/__tests__/sandbox.test.ts"
+      ]
+    },
+    {
+      "id": "US-006",
+      "title": "Document and verify the upgrade",
+      "description": "As an operator, I want tests and instructions so that I know when the upgrade changes a running sandbox.",
+      "acceptanceCriteria": [
+        "Tests cover parsing, success, failure, restoration, and persistent home data with an injected runner.",
+        "`docs/lifecycle-commands.md` warns that container recreation interrupts active sessions and preserves home data.",
+        "`.agro/cli/README.md` documents the command and distinguishes it from CLI self-upgrade.",
+        "Typecheck, full tests, build, and applicable eval probes exit with code 0."
+      ],
+      "priority": 6,
+      "dependsOn": ["US-005"],
+      "passes": false,
+      "notes": "",
+      "files": [
+        ".agro/cli/src/__tests__/cli-first-help.test.ts",
+        "docs/lifecycle-commands.md",
+        ".agro/cli/README.md"
+      ]
     }
   ]
 }
