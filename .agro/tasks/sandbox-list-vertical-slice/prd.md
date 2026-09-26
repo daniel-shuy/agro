@@ -117,4 +117,4 @@ None.
 
 ## Lessons
 
-None.
+- Claim: A probe that scans a source path can fail when the implementation moves without changing behavior. Evidence: `agro-sandbox-image-mode.sh` failed in CI after sandbox parsing moved from `cli.ts` to `controllers/sandbox.ts`; the updated probe passed against the controller and failed against missing flags. Outcome: fixed in this PR.
