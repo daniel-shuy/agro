@@ -147,8 +147,9 @@
       ],
       "priority": 7,
       "dependsOn": ["US-006"],
-      "passes": false,
-      "notes": "",
+      "passes": true,
+      "commit": "d7719286",
+      "notes": "Executed: git ls-files .agro/plans returns empty (0); test ! -e .agro/plans in task worktree (0); bash .agro/evals/probes/prd-output-path-contract.sh (0). Reasoned: searches show no live procedure reading the deleted archive; ignored drafts in root checkout remain intact and .gitignore continues to protect them.",
       "files": [
         ".agro/plans/archive/2026-09-10/cli-first-release/plan.md"
       ]

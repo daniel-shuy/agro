@@ -176,3 +176,4 @@ None.
 
 - Claim: A probe that scans a source path can fail when the implementation moves without changing behavior. Evidence: `agro-sandbox-image-mode.sh` failed in CI after sandbox parsing moved from `cli.ts` to `controllers/sandbox.ts`; the updated probe passed against the controller and failed against missing flags. Outcome: fixed in this PR.
 - Claim: A failed config write after container recreation can leave the running image different from the stored image. Evidence: an injected write failure reproduced that state; the upgrade now attempts to restore the prior image and reports failed restoration. Outcome: fixed in this PR.
+- Claim: A retired private planning path can leave a tracked archive behind. Evidence: `git ls-files .agro/plans` found one historical plan before removal and no paths afterward. Outcome: fixed in this PR.
