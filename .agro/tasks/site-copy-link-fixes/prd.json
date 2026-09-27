@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "project": "agro",
+  "branchName": "bug/1215-site-copy-link-fixes",
+  "description": "Fix two harness doc links that break the site copy",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Fix the stale anchor and the bare autolink",
+      "description": "As a docs maintainer, I want harness pages that copy to the site unchanged, so that the next docs sync needs no link fix.",
+      "acceptanceCriteria": [
+        "In `docs/intro.md`, the link to the security page uses the anchor `#4-sandbox-isolation--the-docker-socket-caveat--enforced-with-a-caveat`.",
+        "In `docs/runtimes/docker.md`, line 29 writes the link as `[https://docs.docker.com/engine/install/](https://docs.docker.com/engine/install/)`.",
+        "`grep -rn '<https\\?://' docs --exclude-dir=rfcs` prints nothing.",
+        "`git diff --stat origin/development` shows 2 changed lines in 2 files, apart from the task files.",
+        "`pnpm build:harness`, `pnpm test`, and `pnpm typecheck` exit 0."
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [],
+      "files": [
+        "docs/intro.md",
+        "docs/runtimes/docker.md"
+      ]
+    }
+  ]
+}
