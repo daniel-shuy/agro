@@ -172,19 +172,53 @@ describe("agro sandbox upgrade", () => {
     expect(existsSync(join(root, ".sandbox-upgrade.lock"))).toBe(false);
   });
 
-  it("reports failed restoration and uses the CLI-version image when no ref was pinned", async () => {
+  it("restores the inspected container image rather than the updated CLI image for an unpinned entry", async () => {
     registry();
+    vi.stubEnv("SANDBOX_NAME", "box");
     const root = seed("box", { mode: "image", pullPolicy: "always" });
     const before = readFileSync(join(root, "agro.json"), "utf8");
+    const oldImage = officialImageRef("0.12.0");
+    const newImage = officialImageRef("0.16.0");
+    expect(oldImage).not.toBe(officialImageRef(AGRO_VERSION));
+    const calls: RecordedCall[] = [];
     const envs: string[] = [];
-    const { err, io } = makeIo();
-    expect(await runSandboxUpgrade({ bin: "agro", name: "box", version: "0.13.0", run: (_cmd, _args, opts) => {
+    const run: LifecycleRunner = (cmd, args, opts) => {
+      calls.push({ cmd, args: [...args] });
+      expect(readFileSync(join(root, "agro.json"), "utf8")).toBe(before);
+      expect(existsSync(join(root, ".sandbox-upgrade.lock"))).toBe(true);
+      if (cmd === "docker") return { status: 0, stdout: `${oldImage}\n` };
       envs.push(opts.env?.AGRO_SANDBOX_IMAGE ?? "");
-      return { status: 1 };
-    } }, io)).toBe(1);
-    expect(envs).toEqual([target, officialImageRef(AGRO_VERSION)]);
-    expect(err.join("")).toContain("restoration failed");
+      return { status: envs.length === 1 ? 42 : 0 };
+    };
+    const { err, io } = makeIo();
+    expect(await runSandboxUpgrade({ bin: "agro", name: "box", version: "0.16.0", run }, io)).toBe(1);
+    expect(calls[0]).toEqual({ cmd: "docker", args: ["inspect", "-f", "{{.Config.Image}}", "box"] });
+    expect(calls.slice(1).map(({ cmd }) => cmd)).toEqual(["bash", "bash"]);
+    expect(envs).toEqual([newImage, oldImage]);
+    expect(err.join("")).toContain("provisioning failed");
     expect(readFileSync(join(root, "agro.json"), "utf8")).toBe(before);
+    expect(existsSync(join(root, ".sandbox-upgrade.lock"))).toBe(false);
+  });
+
+  it.each([
+    { status: 1, stdout: "" },
+    { status: 0, stdout: "  \n" },
+  ])("refuses an unpinned upgrade when inspect cannot identify the prior image (%j)", async (result) => {
+    registry();
+    vi.stubEnv("SANDBOX_NAME", "box");
+    const root = seed("box", { mode: "image" });
+    const before = readFileSync(join(root, "agro.json"), "utf8");
+    const calls: RecordedCall[] = [];
+    const { err, io } = makeIo();
+    const run: LifecycleRunner = (cmd, args) => {
+      calls.push({ cmd, args: [...args] });
+      return result;
+    };
+    expect(await runSandboxUpgrade({ bin: "agro", name: "box", version: "0.16.0", run }, io)).toBe(1);
+    expect(calls).toEqual([{ cmd: "docker", args: ["inspect", "-f", "{{.Config.Image}}", "box"] }]);
+    expect(err.join("")).toContain("cannot determine previous image");
+    expect(readFileSync(join(root, "agro.json"), "utf8")).toBe(before);
+    expect(existsSync(join(root, ".sandbox-upgrade.lock"))).toBe(false);
   });
 
   it("refuses concurrent same-entry upgrades but permits another entry", async () => {
