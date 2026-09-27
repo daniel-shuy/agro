@@ -29,7 +29,7 @@ Update policy and release automation live in [`/git`](.claude/skills/git/SKILL.m
 
 ### Fixed
 
-- Restore the running container image after a failed upgrade of an unpinned sandbox, or refuse the upgrade if that image cannot be inspected ([#1208](https://github.com/mifunedev/agro/issues/1208)).
+- Restore the running container image after a failed upgrade of an unpinned sandbox, or refuse the upgrade if that image cannot be inspected ([#1217](https://github.com/mifunedev/agro/issues/1217)).
 - Record `docker-engine` and `desktop` host installs without a `~/.local` prefix, and make `agro tool uninstall` link manual removal steps for both ([#1185](https://github.com/mifunedev/agro/issues/1185)).
 
 ## [0.15.0] - 2026-09-24
