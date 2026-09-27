@@ -131,14 +131,23 @@ jobs:
         run: node .agro/scripts/reserve-github-release.mjs
 
   publish-image:
-    name: Build, smoke, and publish GHCR image
+    name: Build, smoke, and publish GHCR image for ${{ matrix.platform }}
     needs: reserve
     if: ${{ needs.reserve.outputs.publishedNoop != 'true' }}
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            platform: linux
+            arch: amd64
+          - runner: ubuntu-24.04-arm
+            platform: linux
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
     # `needs` is valid in job concurrency expressions. Atomic reservations give
     # distinct push SHAs distinct versions; only same-SHA retries share this key.
     concurrency:
-      group: release-image-${{ needs.reserve.outputs.releaseVersion }}
+      group: release-image-${{ needs.reserve.outputs.releaseVersion }}-${{ matrix.arch }}
       cancel-in-progress: false
     permissions:
       contents: read
@@ -156,6 +165,8 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
+        with:
+          platforms: ${{ matrix.platform }}
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v4
@@ -164,26 +175,20 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build immutable Docker image tags
-        env:
-          RELEASE_SHA: ${{ needs.reserve.outputs.releaseSha }}
-          RELEASE_VERSION: ${{ needs.reserve.outputs.releaseVersion }}
-          SANDBOX_NAME: agro-release-smoke-${{ github.run_id }}
-        run: |
-          VERSION_IMAGE="ghcr.io/mifunedev/agro:${RELEASE_VERSION}"
-          SHA_IMAGE="ghcr.io/mifunedev/agro:sha-${RELEASE_SHA}"
-          AGRO_VERSION_IMAGE="ghcr.io/mifunedev/agro:${RELEASE_VERSION}"
-          AGRO_SHA_IMAGE="ghcr.io/mifunedev/agro:sha-${RELEASE_SHA}"
-          SMOKE_IMAGE="sandbox-${SANDBOX_NAME}"
-          docker buildx build --load -f .devcontainer/Dockerfile \
-            -t "$VERSION_IMAGE" -t "$SHA_IMAGE" \
-            -t "$AGRO_VERSION_IMAGE" -t "$AGRO_SHA_IMAGE" -t "$SMOKE_IMAGE" .
+      - name: Build local smoke-test image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: .devcontainer/Dockerfile
+          platforms: ${{ matrix.platform }}
+          load: true
+          tags: sandbox-agro-release-smoke-${{ github.run_id }}-${{ matrix.arch }}
 
-      # Keep this pre-push smoke gate between build and publication: it boots
-      # the exact image object that carries all four immutable GHCR tags.
+      # Keep this pre-push smoke gate between build and publication: it tests
+      # the image object before publishing to GHCR.
       - name: Smoke-test Docker image before publish
         env:
-          SANDBOX_NAME: agro-release-smoke-${{ github.run_id }}
+          SANDBOX_NAME: agro-release-smoke-${{ github.run_id }}-${{ matrix.arch }}
           BOOT_SMOKE_TIMEOUT_SECONDS: "900"
           BOOT_SMOKE_INTERVAL_SECONDS: "10"
           BOOT_SMOKE_UP_ARGS: "up -d --no-build"
@@ -191,7 +196,7 @@ jobs:
 
       - name: Smoke-test agro as a first-class entry point
         env:
-          SANDBOX_NAME: agro-release-smoke-${{ github.run_id }}
+          SANDBOX_NAME: agro-release-smoke-${{ github.run_id }}-${{ matrix.arch }}
           RELEASE_VERSION: ${{ needs.reserve.outputs.releaseVersion }}
         run: |
           SMOKE_IMAGE="sandbox-${SANDBOX_NAME}"
@@ -208,23 +213,80 @@ jobs:
             exit 1
           fi
 
-      - name: Push immutable SemVer and sha-full-SHA tags
+      - name: Push image by digest (untagged)
+        id: push
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: .devcontainer/Dockerfile
+          platforms: ${{ matrix.platform }}
+          outputs: type=registry,name=ghcr.io/${{ github.repository }},push-by-digest=true,name-canonical=true
+
+      - name: Export digest
+        env:
+          DIGEST: ${{ steps.push.outputs.digest }}
+        run: |
+          mkdir -p digests
+          touch "digests/${DIGEST#sha256:}"
+
+      - name: Upload digest artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: digest-${{ matrix.arch }}
+          path: digests
+          if-no-files-found: error
+
+  publish-multiarch-manifest:
+    name: Assemble and publish multi-arch manifest list
+    needs: [reserve, publish-image]
+    if: ${{ needs.reserve.outputs.publishedNoop != 'true' }}
+    runs-on: ubuntu-latest
+    concurrency:
+      group: release-image-${{ needs.reserve.outputs.releaseVersion }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout the reserved commit
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.reserve.outputs.releaseSha }}
+          submodules: recursive
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download digest artifacts
+        uses: actions/download-artifact@v8
+        with:
+          path: digests
+          pattern: digest-*
+          merge-multiple: true
+
+      - name: Create and push multi-arch manifest list
         env:
           RELEASE_SHA: ${{ needs.reserve.outputs.releaseSha }}
           RELEASE_VERSION: ${{ needs.reserve.outputs.releaseVersion }}
         run: |
-          docker push "ghcr.io/mifunedev/agro:${RELEASE_VERSION}"
-          docker push "ghcr.io/mifunedev/agro:sha-${RELEASE_SHA}"
-          docker push "ghcr.io/mifunedev/agro:${RELEASE_VERSION}"
-          docker push "ghcr.io/mifunedev/agro:sha-${RELEASE_SHA}"
+          VERSION_IMAGE="ghcr.io/${{ github.repository }}:${RELEASE_VERSION}"
+          SHA_IMAGE="ghcr.io/${{ github.repository }}:sha-${RELEASE_SHA}"
+          docker buildx imagetools create \
+            -t "$VERSION_IMAGE" -t "$SHA_IMAGE" \
+            $(printf 'ghcr.io/${{ github.repository }}@sha256:%s ' $(ls digests))
 
       - name: Verify the agro and agro version tags share one digest
         env:
           RELEASE_VERSION: ${{ needs.reserve.outputs.releaseVersion }}
         run: |
           .agro/scripts/verify-release-aliases.sh check \
-            "ghcr.io/mifunedev/agro:${RELEASE_VERSION}" \
-            "ghcr.io/mifunedev/agro:${RELEASE_VERSION}"
+            "ghcr.io/${{ github.repository }}:${RELEASE_VERSION}" \
+            "ghcr.io/${{ github.repository }}:${RELEASE_VERSION}"
 
       - name: Promote latest from the canonical branch by digest
         env:
