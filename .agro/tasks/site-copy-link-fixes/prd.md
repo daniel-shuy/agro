@@ -12,11 +12,11 @@ Issue: mifunedev/agro#1215. Epic: mifunedev/agro#1206.
 
 **Acceptance Criteria:**
 
-- [ ] In `docs/intro.md`, the link to the security page uses the anchor `#4-sandbox-isolation--the-docker-socket-caveat--enforced-with-a-caveat`.
-- [ ] In `docs/runtimes/docker.md`, line 29 writes the link as `[https://docs.docker.com/engine/install/](https://docs.docker.com/engine/install/)`.
-- [ ] `grep -rn '<https\?://' docs --exclude-dir=rfcs` prints nothing.
-- [ ] `git diff --stat origin/development` shows 2 changed lines in 2 files, apart from the task files.
-- [ ] `pnpm build:harness`, `pnpm test`, and `pnpm typecheck` exit 0.
+- [x] In `docs/intro.md`, the link to the security page uses the anchor `#4-sandbox-isolation--the-docker-socket-caveat--enforced-with-a-caveat`.
+- [x] In `docs/runtimes/docker.md`, line 29 writes the link as `[https://docs.docker.com/engine/install/](https://docs.docker.com/engine/install/)`.
+- [x] `grep -rn '<https\?://' docs --exclude-dir=rfcs` prints nothing.
+- [x] `git diff --stat origin/development` shows 2 changed lines in 2 files, apart from the task files.
+- [x] `pnpm build:harness`, `pnpm test`, and `pnpm typecheck` exit 0.
 
 ## Summary
 
@@ -73,10 +73,10 @@ None.
 
 ## Acceptance Criteria
 
-- [ ] US-001 has `passes: true` in `prd.json`.
-- [ ] CI is green on the PR.
-- [ ] The PR body closes #1215.
+- [x] US-001 has `passes: true` in `prd.json`.
+- [x] CI is green on the PR.
+- [x] The PR body closes #1215.
 
 ## Lessons
 
-Filled by the advisor before undraft.
+None.

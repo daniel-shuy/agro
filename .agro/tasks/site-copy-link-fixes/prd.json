@@ -16,13 +16,14 @@
         "`pnpm build:harness`, `pnpm test`, and `pnpm typecheck` exit 0."
       ],
       "priority": 1,
-      "passes": false,
-      "notes": "",
+      "passes": true,
+      "notes": "Commit c06f3f8b, fast-forwarded onto the task branch. AC1 executed: the diff changes the anchor from #3- to #4-, and grep finds the section 4 heading at docs/security-considerations.md:122. AC2 executed: the diff shows line 29 as [url](url). AC3 executed: grep -rn for bare autolinks outside rfcs prints nothing (exit 1). AC4 executed: git diff --stat shows 2 files, 1 line each, apart from the task files. AC5 executed on the task branch: pnpm build:harness exit 0, pnpm test exit 0 (1779 tests), pnpm typecheck exit 0.",
       "dependsOn": [],
       "files": [
         "docs/intro.md",
         "docs/runtimes/docker.md"
-      ]
+      ],
+      "commit": "c06f3f8b"
     }
   ]
 }
