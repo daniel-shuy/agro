@@ -40,6 +40,7 @@ Amazon Bedrock, Vertex or Foundry, reads no project instructions at all.
 |---|---|
 | `agro sandbox install <runtime> [--name <name>] [--checkout <dir>] [--yes] [--version <X.Y.Z>] [--image[=<ref>]] [--no-build]` | write the registry entry, then `docker-compose.sh up -d` inside it |
 | `agro sandbox list [--json]` | every registry entry: name, runtime, status, checkout |
+| `agro sandbox upgrade <name> --version <X.Y.Z>` | recreate one image-mode sandbox with the specified official release image; keep its home and named volumes |
 | `agro shell [name]` | an interactive `zsh` in the sandbox container |
 | `agro stop [name]` | `docker-compose.sh stop` — containers down, volumes kept |
 | `agro restart [name]` | `docker-compose.sh restart` |
@@ -107,6 +108,44 @@ agro shell <name>                # attach as the sandbox user
 bound directory under the key `checkout`. The JSON output keeps the key `repo` as
 a deprecated key. It holds the identical value and stays present for existing consumers. Read
 `checkout`.
+
+## Upgrading a sandbox image: `agro sandbox upgrade`
+
+Run `agro sandbox upgrade <name> --version X.Y.Z` on the host to apply a specific
+AGRO release image to a registered image-mode sandbox. The command also accepts
+a leading `v` or a release prerelease suffix. The command requires an explicit
+version and never selects `latest`. The command refuses build-mode sandboxes
+and missing entries.
+
+**The command recreates the container immediately. Every active agent session,
+server, and job inside that container stops.** Choose a time when the interruption
+is acceptable. The new container keeps the sandbox home mount, named volumes,
+checkout, `.env`, and unrelated configuration. The command does not use `down -v`.
+
+The command applies the image through the existing Compose wrapper and records
+`image.ref` only after a successful start. If provisioning or config persistence
+fails, the command keeps the old `image.ref` and attempts to restore the prior
+image. If restoration fails, the command reports that failure. Inspect the
+sandbox with `agro ps <name>` and repair it before resuming work. The command
+creates `.sandbox-upgrade.lock` in the entry. It removes the lock after a normal
+success or failure. An abrupt interruption, including `SIGKILL` or a crash,
+can leave the lock in place. The command refuses another upgrade of that entry
+and prints the lock path. Other entries can upgrade independently.
+
+If an upgrade refuses because the lock exists, recover on the host:
+
+1. Confirm that no upgrade process owns the entry. A PID in the lock can help
+   identify a process, but a PID alone does not prove whether that process owns
+   the entry.
+2. Only after that confirmation, remove the exact lock path printed by the
+   command.
+3. Retry `agro sandbox upgrade <name> --version X.Y.Z`.
+
+A conflicting `AGRO_SANDBOX_IMAGE` in the host shell or entry `.env` causes a
+refusal before recreation.
+
+`agro sandbox upgrade` changes the sandbox image, not the installed host CLI.
+Use `agro update` to upgrade the installed CLI without changing a sandbox.
 
 ## Upgrading the CLI: `agro self-upgrade`
 
@@ -205,6 +244,7 @@ Keep the two `update` verbs apart:
 | Command | Upgrades | Writes |
 |---|---|---|
 | `agro update` | the installed `agro` executable | nothing in the project |
+| `agro sandbox upgrade <name> --version X.Y.Z` | one sandbox's image | `image.ref` in its registry entry after successful recreation |
 | `agro vendor` | the vendored control plane | `.agro/` and `crons/` in the current directory |
 
 Details: [`agro self-upgrade`](#upgrading-the-cli-agro-self-upgrade) and
@@ -282,6 +322,7 @@ legacy `AGRO_EXECUTION_TARGET` spelling still applies when the AGRO one is unset
 | `agro harness list/status` | probes the host install prefix `~/.local` when the container is not reachable; reports `?` when neither a harness root nor that prefix exists | reports the real state of this environment |
 | `agro tool list/status` | probes the host install prefix `~/.local` when the container is not reachable; reports `?` when neither a harness root nor that prefix exists | reports the real state of this environment |
 | `agro sandbox install` | provisions the sandbox | refuses with a host-only error |
+| `agro sandbox upgrade` | recreates one image-mode sandbox with an explicit release image | refuses with a host-only error |
 | `agro shell` | `docker exec` into the container | opens a local `zsh` |
 
 `agro harness` and `agro tool` treat an unspawnable container runtime as an
@@ -304,6 +345,16 @@ into `~/.local` for the invoking user. The install prefix is never derived from
 the harness root, so the clone stays clean. A non-interactive run needs `--host`
 or `--path`; without either it keeps the refusal. See
 [Harnesses Overview](harnesses/overview.md#installing-a-harness).
+
+A harness or tool counts as installed only after a complete install. In the
+sandbox, `agro harness install` writes
+`~/.local/share/agro/harnesses/<id>.installed` and `agro tool install` writes
+`~/.local/share/agro/tools/<id>.installed` after the full install command
+succeeds. On the host, each command records a receipt in `~/.agro/config.json`.
+If an install fails after the binary appears, the next install runs the full
+install again. The uninstall command removes the record. A host binary outside
+`~/.local` still counts as installed. A root-level host tool, such as
+`docker-engine` or `desktop`, also counts as installed when its check passes.
 
 `agro tool install <id>` uses the same host path, with two limits. A tool must
 declare a host install. `agent-browser`, `herdr`, `cloudflared`, `microsandbox`,

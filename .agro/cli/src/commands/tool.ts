@@ -17,8 +17,9 @@ import {
   readHostConfig,
   recordHarnessRoot,
   resolveHarnessRoot,
+  isRootToolReceipt,
   writeHostConfig,
-  type HostHarnessReceipt,
+  type HostToolReceipt,
 } from "../lib/host-config.js";
 import { resolveExistingWorkspace } from "../lib/host-workspace.js";
 import { resolveProjectRoot } from "../lib/project.js";
@@ -36,6 +37,8 @@ import {
 } from "../lib/tools/catalog.js";
 import { configuredContainerName, DEFAULT_CONTAINER_NAME } from "./lifecycle.js";
 
+
+const ROOT_TOOL_REMOVAL_DOCS = `${sourceDocsUrl("docs/installation.md")}#remove-a-root-level-tool`;
 
 export interface ToolIO {
   stdout: (s: string) => void;
@@ -106,6 +109,23 @@ function targetFor(
 
 function hostPrefix(home: string): string {
   return join(home, ".local");
+}
+
+function sandboxMarkerPath(entry: ToolEntry): string {
+  return `${SANDBOX_HARNESS_PREFIX}/share/agro/tools/${entry.id}.installed`;
+}
+
+async function sandboxMarkerExists(target: ExecutionTarget, entry: ToolEntry): Promise<boolean> {
+  const r = await target.exec({
+    argv: ["test", "-f", sandboxMarkerPath(entry)],
+    user: "sandbox",
+    stdio: "capture",
+  });
+  return r.exitCode === 0;
+}
+
+function hostBinaryUnderPrefix(entry: ToolEntry, prefix: string): boolean {
+  return existsSync(join(harnessBinPath(prefix), entry.binary));
 }
 
 function pathEntries(env: NodeJS.ProcessEnv): string[] {
@@ -466,7 +486,17 @@ async function installOnHost(
   const installEnv: Record<string, string> = { NPM_USER_PREFIX: prefix };
   const target = hostTargetFor(root, prefix, run, env);
 
-  if (await probeInstalled(target, entry, undefined, installEnv) === true) {
+  let hasReceipt: boolean;
+  try {
+    hasReceipt = readHostConfig(env, home).hostTools?.[entry.id] !== undefined;
+  } catch (err) {
+    io.stderr(`${bin} tool: ${messageOf(err)}\n`);
+    return 1;
+  }
+  if (
+    await probeInstalled(target, entry, undefined, installEnv) === true &&
+    (hasReceipt || entry.hostInstallUser === "root" || !hostBinaryUnderPrefix(entry, prefix))
+  ) {
     io.stdout(`${entry.id}: already installed (${entry.binary})\n`);
     try {
       recordHarnessRoot(root, env, home);
@@ -500,13 +530,11 @@ async function installOnHost(
     return r.exitCode;
   }
 
-  const receipt: HostHarnessReceipt = {
-    prefix,
-    binary: entry.binary,
-    binPath: harnessBinPath(prefix),
-    installedAt: new Date().toISOString(),
-    workspaceRoot: root,
-  };
+  const installedAt = new Date().toISOString();
+  const receipt: HostToolReceipt =
+    entry.hostInstallUser === "root"
+      ? { scope: "root", binary: entry.binary, installedAt, workspaceRoot: root }
+      : { prefix, binary: entry.binary, binPath: harnessBinPath(prefix), installedAt, workspaceRoot: root };
   try {
     const config = readHostConfig(env, home);
     writeHostConfig(
@@ -568,7 +596,7 @@ export async function runToolInstall(
   if (entry.installArgv === undefined) return refuseContainer();
 
   const already = await probeInstalled(target, entry, "sandbox");
-  if (already === true) {
+  if (already === true && await sandboxMarkerExists(target, entry)) {
     io.stdout(`${entry.id}: already installed (${entry.binary})\n`);
     return 0;
   }
@@ -588,6 +616,17 @@ export async function runToolInstall(
   if (r.exitCode !== 0) {
     io.stderr(`${opts.bin} tool: installing ${entry.id} failed (exit ${r.exitCode}).\n`);
     return r.exitCode;
+  }
+
+  const marker = sandboxMarkerPath(entry);
+  const marked = await target.exec({
+    argv: ["sh", "-c", `mkdir -p "$(dirname "$1")" && : > "$1"`, "sh", marker],
+    user: "sandbox",
+    stdio: "capture",
+  });
+  if (marked.exitCode !== 0) {
+    io.stderr(`${opts.bin} tool: could not record the install at ${marker} (exit ${marked.exitCode}).\n`);
+    return 1;
   }
 
   io.stdout(`${entry.id}: installed — see ${sourceDocsUrl(entry.docsPath)}\n`);
@@ -669,7 +708,7 @@ async function uninstallOnHost(
     return 1;
   }
 
-  const prefix = receipt?.prefix ?? computed;
+  const prefix = receipt === undefined || isRootToolReceipt(receipt) ? computed : receipt.prefix;
   const target = hostTargetFor(receipt?.workspaceRoot ?? workspace, prefix, run, env);
   const outcome = await removeTool(entry, target, prefix, undefined, opts, io, true);
 
@@ -698,6 +737,15 @@ export async function runToolUninstall(
   const entry = findTool(name);
   if (!entry) return unknownTool(name, io, opts.bin);
 
+  if (entry.hostInstallUser === "root") {
+    io.stderr(
+      `${opts.bin} tool: ${entry.id} cannot be removed by this command.\n` +
+        `${opts.bin} does not remove system packages that it installed as root.\n` +
+        `Remove ${entry.id} by hand: ${ROOT_TOOL_REMOVAL_DOCS}\n`,
+    );
+    return 1;
+  }
+
   if (entry.uninstallArgv === null) {
     io.stderr(`${opts.bin} tool: ${entry.id} cannot be removed by this command.\n\n`);
     io.stderr(`${entry.notInstallableReason?.(opts.bin) ?? ""}\n`);
@@ -709,5 +757,17 @@ export async function runToolUninstall(
     return await uninstallOnHost(entry, opts, io, run);
   }
 
-  return (await removeTool(entry, target, SANDBOX_HARNESS_PREFIX, "sandbox", opts, io)).code;
+  const outcome = await removeTool(entry, target, SANDBOX_HARNESS_PREFIX, "sandbox", opts, io);
+  if (outcome.dropReceipt) {
+    const cleared = await target.exec({
+      argv: ["rm", "-f", sandboxMarkerPath(entry)],
+      user: "sandbox",
+      stdio: "capture",
+    });
+    if (cleared.exitCode !== 0) {
+      io.stderr(`${opts.bin} tool: could not clear the install record (exit ${cleared.exitCode}).\n`);
+      return 1;
+    }
+  }
+  return outcome.code;
 }

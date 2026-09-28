@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # tier: A
 # source: conversation 2026-07-05 (basic Docker deployment — prebuilt-image mode)
-# desc: guards prebuilt-image deployment mode — compose image/pull_policy parameterized (AGRO_SANDBOX_IMAGE, AGRO_PULL_POLICY) with the build: block retained so local build stays default; agro.json carries image.ref/image.pullPolicy, config-render.ts renders both and defaults AGRO_SANDBOX_IMAGE to officialImageRef(AGRO_VERSION) only in image mode, docs/configuration.md documents both; docker-compose.sh passes `up -d --no-build` through verbatim; agro sandbox (lifecycle.ts/cli.ts) wires --image/--version/--no-build, unselected default officialImageRef(AGRO_VERSION) (lib/version.ts maps an X.Y.Z or X.Y.Z-<channel>.<n> CLI version to its own ghcr.io/mifunedev/agro tag, anything else to latest), and threads SANDBOX_IMAGE; get-agro.sh no longer claims the CLI is unpublished
+# desc: guards prebuilt-image deployment mode — compose image/pull_policy parameterized (AGRO_SANDBOX_IMAGE, AGRO_PULL_POLICY) with the build: block retained so local build stays default; agro.json carries image.ref/image.pullPolicy, config-render.ts renders both and defaults AGRO_SANDBOX_IMAGE to officialImageRef(AGRO_VERSION) only in image mode, docs/configuration.md documents both; docker-compose.sh passes `up -d --no-build` through verbatim; agro sandbox (lifecycle.ts/controllers/sandbox.ts, delegated from cli.ts) wires --image/--version/--no-build, unselected default officialImageRef(AGRO_VERSION) (lib/version.ts maps an X.Y.Z or X.Y.Z-<channel>.<n> CLI version to its own ghcr.io/mifunedev/agro tag, anything else to latest), and threads SANDBOX_IMAGE; get-agro.sh no longer claims the CLI is unpublished
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
@@ -13,6 +13,7 @@ RENDER_SRC="$ROOT/.agro/cli/src/lib/config-render.ts"
 WRAPPER="$ROOT/.agro/scripts/docker-compose.sh"
 LIFECYCLE="$ROOT/.agro/cli/src/commands/lifecycle.ts"
 CLI="$ROOT/.agro/cli/src/cli.ts"
+SANDBOX_CONTROLLER="$ROOT/.agro/cli/src/controllers/sandbox.ts"
 VERSION_SRC="$ROOT/.agro/cli/src/lib/version.ts"
 GETOH="$ROOT/.agro/scripts/get-agro.sh"
 
@@ -85,11 +86,21 @@ if [[ -f "$IMAGE_ONLY" ]]; then
   grep -Eq 'image:[[:space:]]*\$\{AGRO_SANDBOX_IMAGE:-ghcr.io/mifunedev/agro:latest\}' "$IMAGE_ONLY" \
     || fails+=("docker-compose.image-only.yml unselected fallback must be \${AGRO_SANDBOX_IMAGE:-ghcr.io/mifunedev/agro:latest}")
 fi
+if [[ -f "$SANDBOX_CONTROLLER" ]]; then
+  grep -Fq 'token.startsWith("--image=")' "$SANDBOX_CONTROLLER" \
+    || fails+=("controllers/sandbox.ts parseSandboxArgs must handle --image=<ref>")
+  grep -Fq 'token.startsWith("--version=")' "$SANDBOX_CONTROLLER" \
+    || fails+=("controllers/sandbox.ts parseSandboxArgs must handle --version=<X.Y.Z>")
+else
+  fails+=("controllers/sandbox.ts is missing — sandbox parser must live in the controller")
+fi
 if [[ -f "$CLI" ]]; then
-  grep -Fq -- '--image=' "$CLI" \
-    || fails+=("cli.ts parseSandboxArgs must handle --image=<ref>")
-  grep -Fq -- '"--version="' "$CLI" \
-    || fails+=("cli.ts parseSandboxArgs must handle --version=<X.Y.Z>")
+  grep -Fq 'import { runSandboxCommand } from "./controllers/sandbox.js";' "$CLI" \
+    || fails+=("cli.ts must import runSandboxCommand from controllers/sandbox.ts")
+  grep -Fq 'if (first === "sandbox") return runSandboxCommand(argv.slice(1), bin);' "$CLI" \
+    || fails+=("cli.ts must delegate sandbox commands to controllers/sandbox.ts")
+else
+  fails+=("cli.ts is missing — sandbox commands must delegate to controllers/sandbox.ts")
 fi
 
 if [[ -f "$GETOH" ]] && grep -Fq 'not published to npm' "$GETOH"; then

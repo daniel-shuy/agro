@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 const ROOT = join(import.meta.dirname, "../../..");
 const SCRIPT = join(ROOT, ".agro", "scripts", "sandbox-boot-smoke.sh");
 const PREFIX = "/home/sandbox/.local";
+const SMOKE_TEST_TIMEOUT_MS = 30_000;
 
 const HOST_UID = String(process.getuid?.() ?? 0);
 const HOST_GID = String(process.getgid?.() ?? 0);
@@ -206,7 +207,7 @@ function runSmoke(fx: ReturnType<typeof fixture>, extraEnv: Record<string, strin
   });
 }
 
-describe("sandbox boot smoke systemd supervision", () => {
+describe("sandbox boot smoke systemd supervision", { timeout: SMOKE_TEST_TIMEOUT_MS }, () => {
   it("fails when PID 1 is not systemd", () => {
     const result = runSmoke(fixture({ pid1: "docker-init" }));
 
@@ -221,11 +222,11 @@ describe("sandbox boot smoke systemd supervision", () => {
     expect(result.stderr).toContain("agro-cron.service is not active");
   });
 
-  it("fails when systemctl reload never reaches the runtime's SIGHUP path", () => {
+  it("fails when systemctl reload never reaches the runtime's SIGUSR1 path", () => {
     const result = runSmoke(fixture({ reloadIsInert: true }));
 
     expect(result.status).toBe(1);
-    expect(result.stderr).toContain("did not reach the runtime's SIGHUP path");
+    expect(result.stderr).toContain("did not reach the runtime's SIGUSR1 path");
   });
 
   it("fails when systemd does not recover the scheduler after SIGKILL", () => {
@@ -240,12 +241,12 @@ describe("sandbox boot smoke systemd supervision", () => {
 
     expect(result.status).toBe(0);
     expect(result.stdout).toContain("systemd is PID 1 and supervises cron-runtime.ts at PID 1234");
-    expect(result.stdout).toContain("exercised the existing SIGHUP reschedule");
+    expect(result.stdout).toContain("exercised the SIGUSR1 reschedule");
     expect(result.stdout).toContain("recovered the killed scheduler at PID 4242");
   });
 });
 
-describe("sandbox boot smoke", () => {
+describe("sandbox boot smoke", { timeout: SMOKE_TEST_TIMEOUT_MS }, () => {
   it("starts the sandbox service, polls the healthcheck, and tears down", () => {
     const fx = fixture();
 
