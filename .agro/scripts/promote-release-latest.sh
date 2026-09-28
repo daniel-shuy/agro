@@ -92,7 +92,7 @@ fi
 
 : "${RELEASE_VERSION:?RELEASE_VERSION is required for promote mode}"
 
-IMAGE_REPOSITORIES=${IMAGE_REPOSITORIES:-ghcr.io/mifunedev/agro}
+IMAGE_REPOSITORIES=${IMAGE_REPOSITORIES:-ghcr.io/daniel-shuy/agro}
 read -r -a repositories <<< "$IMAGE_REPOSITORIES"
 if (( ${#repositories[@]} == 0 )); then
   echo "IMAGE_REPOSITORIES must name at least one image repository" >&2

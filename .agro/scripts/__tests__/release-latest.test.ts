@@ -127,7 +127,7 @@ describe("promote-release-latest.sh", () => {
     const source = readFileSync(HELPER, "utf8");
 
     expect(source).toContain(
-      "IMAGE_REPOSITORIES=${IMAGE_REPOSITORIES:-ghcr.io/mifunedev/agro}",
+      "IMAGE_REPOSITORIES=${IMAGE_REPOSITORIES:-ghcr.io/daniel-shuy/agro}",
     );
     expect(source).not.toContain("IMAGE_REPOSITORY=");
   });
