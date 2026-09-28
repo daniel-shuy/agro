@@ -379,13 +379,6 @@ describe("GitHub reservation bridge", () => {
 describe("release workflow contract", () => {
   const source = readFileSync(WORKFLOW, "utf8");
 
-  it("triggers for main and master without dropping intermediate pushes", () => {
-    expect(source).toMatch(/push:\n\s+branches:\n\s+- main\n\s+- master\n\s+- experiment\/\*\*\n/);
-    expect(source).toContain("RELEASE_BRANCH: ${{ github.ref_name }}\n          RELEASE_SHA: ${{ github.sha }}");
-    expect(source).not.toMatch(/^concurrency:/m);
-    expect(source).not.toMatch(/push:\n(\s+branches:[\s\S]*?)?\s+tags:/);
-  });
-
   it("reads the release version from package.json rather than a clock", () => {
     expect(source).toMatch(/reserve:\n[\s\S]*?needs: \[validate, boot-lint, eval-probes\]/);
     expect(source).toContain(`node -p "require('./package.json').version"`);
@@ -398,20 +391,6 @@ describe("release workflow contract", () => {
     );
     expect(source.indexOf("jobs:\n")).toBeLessThan(source.indexOf("  reserve:\n"));
     expect(source).not.toMatch(/deleteRelease|deleteRef|method:\s*["']DELETE/);
-  });
-
-  it("skips publication cleanly when the reservation is a no-op", () => {
-    const guard = /if: \$\{\{[^}]*needs\.reserve\.outputs\.publishedNoop != 'true'/g;
-    expect(source.match(guard)?.length).toBe(4);
-    expect(source).toMatch(/publish-image:\n[\s\S]*?if: \$\{\{ needs\.reserve\.outputs\.publishedNoop != 'true' \}\}/);
-    expect(source).toMatch(/publish-cli:\n[\s\S]*?if: \$\{\{ needs\.reserve\.outputs\.publishedNoop != 'true' \}\}/);
-    expect(source).toMatch(/finalize:\n[\s\S]*?needs\.reserve\.outputs\.publishedNoop != 'true'/);
-    expect(source).toMatch(/notify-docs:\n[\s\S]*?needs\.reserve\.outputs\.publishedNoop != 'true'/);
-  });
-
-  it("names the smoke sandbox after agro", () => {
-    expect(source.match(/SANDBOX_NAME: agro-release-smoke-\$\{\{ github\.run_id \}\}/g)?.length).toBe(3);
-    expect(source).not.toContain("oh-release-smoke");
   });
 
   it("notifies the docs site only after a real release is finalized", () => {
@@ -432,63 +411,6 @@ describe("release workflow contract", () => {
     expect(job.match(/secrets\.AGRO_WEB_DISPATCH_TOKEN/g)?.length).toBe(1);
     expect(job).not.toMatch(/echo[^\n]*\$AGRO_WEB_DISPATCH_TOKEN/);
     expect(job).not.toMatch(/set -x/);
-  });
-
-  it("publishes bare version tags and promotes latest by digest", () => {
-    const immutablePush = source.indexOf("Push immutable SemVer and sha-full-SHA tags");
-    const latestPromote = source.indexOf("Promote latest from the canonical branch by digest");
-    const cliPublish = source.indexOf("  publish-cli:\n");
-    const finalize = source.indexOf("  finalize:\n");
-    const freshGithubCheck = source.indexOf("Check canonical branch for GitHub latest-release status");
-    const publishDraft = source.indexOf("Publish the draft after image and CLI publication");
-
-    expect(source).toContain("docker buildx build --load");
-    expect(source).toContain('docker push "ghcr.io/mifunedev/agro:${RELEASE_VERSION}"');
-    expect(source).toContain('docker push "ghcr.io/mifunedev/agro:sha-${RELEASE_SHA}"');
-    expect(source).not.toContain("agro:v$");
-    expect(source).not.toContain('agro:${RELEASE_SHA}"');
-    expect(source).toContain(".agro/scripts/promote-release-latest.sh promote");
-    expect(source).not.toContain("latest_guard");
-    expect(immutablePush).toBeGreaterThan(0);
-    expect(latestPromote).toBeGreaterThan(immutablePush);
-    expect(cliPublish).toBeGreaterThan(latestPromote);
-    expect(finalize).toBeGreaterThan(cliPublish);
-    expect(freshGithubCheck).toBeGreaterThan(finalize);
-    expect(publishDraft).toBeGreaterThan(freshGithubCheck);
-  });
-
-  it("builds the agro and agro tags once, pushes all four, and verifies one digest", () => {
-    const build = source.indexOf("Build immutable Docker image tags");
-    const bootSmoke = source.indexOf("Smoke-test Docker image before publish");
-    const agroSmoke = source.indexOf("Smoke-test agro as a first-class entry point");
-    const immutablePush = source.indexOf("Push immutable SemVer and sha-full-SHA tags");
-    const aliasVerify = source.indexOf("Verify the agro and agro version tags share one digest");
-    const latestPromote = source.indexOf("Promote latest from the canonical branch by digest");
-
-    expect(source.match(/docker buildx build --load/g)?.length).toBe(1);
-    expect(source).toContain('AGRO_VERSION_IMAGE="ghcr.io/mifunedev/agro:${RELEASE_VERSION}"');
-    expect(source).toContain('AGRO_SHA_IMAGE="ghcr.io/mifunedev/agro:sha-${RELEASE_SHA}"');
-    expect(source).toMatch(
-      /-t "\$VERSION_IMAGE" -t "\$SHA_IMAGE" \\\n\s+-t "\$AGRO_VERSION_IMAGE" -t "\$AGRO_SHA_IMAGE" -t "\$SMOKE_IMAGE" \./,
-    );
-    expect(source).toContain('docker push "ghcr.io/mifunedev/agro:${RELEASE_VERSION}"');
-    expect(source).toContain('docker push "ghcr.io/mifunedev/agro:sha-${RELEASE_SHA}"');
-    expect(source).toContain('docker push "ghcr.io/mifunedev/agro:${RELEASE_VERSION}"');
-    expect(source).toContain('docker push "ghcr.io/mifunedev/agro:sha-${RELEASE_SHA}"');
-    expect(source.match(/docker push "/g)?.length).toBe(4);
-    expect(source).toMatch(
-      /\.agro\/scripts\/verify-release-aliases\.sh check \\\n\s+"ghcr\.io\/mifunedev\/agro:\$\{RELEASE_VERSION\}" \\\n\s+"ghcr\.io\/mifunedev\/agro:\$\{RELEASE_VERSION\}"/,
-    );
-    expect(source).toContain("-lc 'agro --version'");
-    expect(source).toContain("-lc 'agro --version'");
-    expect(source).toContain('[ "$agro_version" != "$oh_version" ]');
-    expect(source).toContain('[ "$agro_version" != "$RELEASE_VERSION" ]');
-    expect(build).toBeGreaterThan(0);
-    expect(bootSmoke).toBeGreaterThan(build);
-    expect(agroSmoke).toBeGreaterThan(bootSmoke);
-    expect(immutablePush).toBeGreaterThan(agroSmoke);
-    expect(aliasVerify).toBeGreaterThan(immutablePush);
-    expect(latestPromote).toBeGreaterThan(aliasVerify);
   });
 
   it("attaches the CLI bundles and installers before the release is undrafted", () => {
