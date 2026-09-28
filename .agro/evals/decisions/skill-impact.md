@@ -2430,3 +2430,435 @@ index 2b911bd0..dc039294 100644
  Signal: count probes now vs. an earlier git revision, compared against the
  capability `RESULTS.md` suite-score delta over the same span. Growing floor
 ````
+
+## SI-0024 · 2026-09-26 · builder · PROPOSED
+
+- **proposal**: Add only the turn-reduction edits (group 1) of #1197 candidate 3 to `/prd`: parallel setup reads, batched static grounding, one write-and-verify call, one fix call, and no second read of a file.
+- **target**: `.agro/skills/prd/SKILL.md`
+- **motivating patterns**: none (direct request)
+- **proposer**: /builder rule, operator-approved plan `.agro/tasks/prd-turn-reduction/prd.md`, issue #1211, evidence from issue #1197
+- **diff**:
+
+````diff
+diff --git a/.agro/skills/prd/SKILL.md b/.agro/skills/prd/SKILL.md
+index 5fa73436..c6e2def3 100644
+--- a/.agro/skills/prd/SKILL.md
++++ b/.agro/skills/prd/SKILL.md
+@@ -24,6 +24,21 @@ active session.
+ - Plan only. Do not implement, commit, push, open a pull request, launch workers, or start services.
+ - Writing or revising a plan is never approval.
+
++## Cost budget
++
++Each tool call sends the whole context again, so the number of tool calls sets the cost.
++Keep the grounding complete, and remove repeated work.
++
++1. Read the setup files in one turn with two parallel Bash calls. The first call reads the input file, [`references/tracker.md`](references/tracker.md), and each applicable `AGENTS.md`. The second call reads `.agro/skills/ste/SKILL.md` alone.
++2. Ground the plan in about 2 to 4 batched calls. Section 3 gives the batch rules.
++3. Use one Bash call to write the plan and to verify the plan. Section 6 gives the command.
++4. Fix all checker findings in at most one more call.
++
++- Read each file one time. Do not read a file again after its content is in the context.
++- If a tool truncates an output, read only the missing line range with `sed -n`.
++- Do not read `.github/ISSUE_TEMPLATE/feat.md`. Section 5 holds the headings of that template.
++- Send independent tool calls in parallel in the same response.
++
+ ## 1. Resolve the request
+
+ Arguments received: `$ARGUMENTS`
+@@ -64,6 +79,14 @@ revision of it, ask before you replace it.
+
+ 1. Read each applicable `AGENTS.md` and directory `README.md` for the affected paths.
+ 2. Read the code, tests, configuration, and documentation that control the requested behavior.
++   - Before the first read, list the paths and symbols that the request names. Read all of them in one batched call.
++   - Put each file read and each `git grep -n` that you know you need into one command.
++   - Use paths relative to the repository root. Do not start each command with `cd <absolute path>`.
++   - For a long file, use `grep -n` or one `sed -n` window of 80 lines or less. Do not `cat` the whole file.
++   - Do not search again for a symbol that an earlier output located.
++   - Ground the plan statically. Do not run the target code, and do not build fixtures, driver scripts, or temporary harnesses.
++   - When the issue gives a reproduction, cite the issue. Put the reproduction into the red-test criterion of a story.
++   - Stop the grounding when each Key Integration Point, each Test Plan row, and each cited command has a verified source.
+ 3. Separate verified facts from assumptions.
+ 4. Never invent a missing command, path, threshold, or result. Write an explicit placeholder, such as `<test command>`, and add an open question.
+
+@@ -159,11 +182,18 @@ For each story that changes a user interface, add this criterion:
+
+ ## 6. Verify and report
+
+-1. Read the saved file back from disk.
+-2. Confirm that each story has at least one acceptance criterion.
+-3. Confirm that each section is present and in order. `## Lessons` must be the last section.
+-4. Run `bash .agro/skills/ste/scripts/ste-check.sh <prd-path>` from the harness repository. Use an absolute path for another repository.
+-5. Fix each checker finding. Then review the meaning with the ten-question check in `/ste`.
++1. Use one Bash call to write the plan and to verify the plan. Do not use the Write tool.
++   - Write the file with a quoted heredoc, so that backticks and `$` stay literal: `mkdir -p .agro/tasks/<slug> && cat > <prd-path> <<'PRD_EOF'`. End the heredoc with a `PRD_EOF` line.
++   - In the same call, run `grep -n '^## \|^### US-\|^- \[ \]\|^Status:' <prd-path>; bash .agro/skills/ste/scripts/ste-check.sh <prd-path>; echo "exit=$?"`.
++   - Run the checker from the harness repository. Use an absolute path for another repository.
++   - The output of that command is the read-back from disk.
++2. From that output, confirm that each story has at least one acceptance criterion.
++3. From that output, confirm that each section is present and in order. `## Lessons` must be the last section.
++4. If the checker reports findings, fix all of them in one script call. Then run the verification command again in that same call.
++   - Replace each flagged line by its line number with a full new line. Apply the replacements from the highest line number to the lowest.
++   - Do not replace substrings from memory. A pattern that does not match leaves the finding in the file.
++   - Do not print the flagged lines in a separate call, because the checker prints them. Do not read the source of `ste-check.sh`.
++5. Review the meaning with the ten-question check in `/ste`. This review needs no tool call.
+ 6. Report the path, the status, and the open questions.
+
+ Use `DRAFT` only when the plan passes these checks and waits for operator approval.
+````
+
+## SI-0025 · 2026-09-26 · builder · PROPOSED
+
+- **proposal**: Add a headless rule and advisor turn-reduction edits to `/delegate`: record open decisions as stated defaults, report hook blocks and go to the next unblocked story, never end on a question; batch setup reads, read each file once, bound outputs, one verification command per story, and accept from the worker report, `git show --stat`, the owned-path diff, and the verification rerun.
+- **target**: `.agro/skills/delegate/SKILL.md`
+- **motivating patterns**: none (direct request)
+- **proposer**: /builder rule, issue #1226, evidence from `.agro/evals/experiments/delegate-overhead/report.md` (#1224: advisor share 0.56; 2 of 6 episodes stopped on an operator question)
+- **diff**:
+
+````diff
+diff --git a/.agro/skills/delegate/SKILL.md b/.agro/skills/delegate/SKILL.md
+index b9c0dd5a..33ad2651 100644
+--- a/.agro/skills/delegate/SKILL.md
++++ b/.agro/skills/delegate/SKILL.md
+@@ -52,6 +52,34 @@ Each story in `userStories` is one task:
+
+ The advisor skips each story with `passes: true`.
+
++## Cost budget
++
++Each advisor tool call sends the whole context again. Keep acceptance complete,
++and remove repeated work.
++
++- Read `prd.json`, `prd.md`, and each applicable `AGENTS.md` in one batched call.
++- Read each file one time. Do not read a file again after its content is in the
++  context.
++- Keep outputs short. Use `grep -n` or one `sed -n` window. Do not `cat` a long
++  file.
++- Put the verification of one story into one combined command.
++- Do not read the whole worker diff again. Use the worker report, `git show --stat`,
++  the diff of the owned write paths, and the rerun of the verification.
++
++## Headless run
++
++A headless run is a run where no operator can answer, such as an unattended or
++cron run. In a headless run, do these steps:
++
++- Record each open decision as a stated default in the `notes` of the story,
++  and continue.
++- If a hook blocks an action, write the block in the final report, and go to the
++  next unblocked story.
++- Never end the run with a question.
++
++The headless rule does not change the model policy or the hook rules. A default
++never replaces an explicit operator selection, and a block is never bypassed.
++
+ ## Dispatch record
+
+ Write one record for each story before dispatch. Keep only these fields:
+@@ -98,7 +126,8 @@ Give each worker the dispatch record, the exclusions, and these rules:
+
+ A worker report is not acceptance. For each story, the advisor does these steps:
+
+-1. Inspect the worker commit.
++1. Inspect the worker commit with `git show --stat` and the diff of the owned
++   write paths.
+ 2. Bring the commit onto the task branch.
+ 3. Rerun the verification on the integrated task branch.
+ 4. Write `passes: true`, `commit`, and `notes` in `prd.json`. In `notes`,
+@@ -132,7 +161,8 @@ There is no separate ledger. `prd.json` holds the state.
+ - Otherwise, choose a model for each story. Record the reason in the dispatch
+   record.
+ - Never substitute a model silently.
+-- A required control that is unavailable blocks the story. Ask the operator.
++- A required control that is unavailable blocks the story. Ask the operator. In a
++  headless run, report the block and go to the next unblocked story.
+
+ Provider defaults live in provider settings. For Claude Code, the default is
+ `CLAUDE_CODE_SUBAGENT_MODEL` in the `env` object of `.claude/settings.json`.
+````
+
+## SI-0026 · 2026-09-27 · builder · PROPOSED
+
+- **proposal**: State that the byte-for-byte rule wins over rewrite step 6 in `/ste`: a code block with more than one command stays one block, and the prose around the block states the order. Add one multi-command before/after pair to `references/examples.md`.
+- **target**: `.agro/skills/ste/SKILL.md`
+- **motivating patterns**: none (direct request)
+- **proposer**: /builder rule, issue #1187
+- **diff**:
+
+````diff
+diff --git a/.agro/skills/ste/SKILL.md b/.agro/skills/ste/SKILL.md
+index 00bce9dd..f568b59a 100644
+--- a/.agro/skills/ste/SKILL.md
++++ b/.agro/skills/ste/SKILL.md
+@@ -108,7 +108,9 @@ Run these seven steps against an existing document.
+ 3. Rewrite each sentence to carry one idea, in the active voice.
+ 4. Replace every non-approved word with its approved replacement.
+ 5. Move each condition ahead of the action the condition guards.
+-6. Split each step that holds more than one action.
++6. Split each step that holds more than one action. Never split a code block.
++   A block with more than one command stays one block. The prose around the
++   block states the order.
+ 7. Mark each `missing` value with a placeholder. Never supply a value.
+ 8. Run `scripts/ste-check.sh` against the file. Fix each finding. Repeat until
+    the checker exits 0.
+````
+
+## SI-0027 · 2026-09-27 · builder · REJECTED
+
+- **proposal**: Add a "Run without an operator" section to `/delegate`: when the prompt forbids push or GitHub, record hook blocks and steps that need a push, GitHub, or a new issue under `## Not done` in the final report, finish the other steps, and never ask or wait. Rejected: the paired run of #1233 raised the mean advisor cost from $0.409 to $0.510 for each episode, so the #1226 condition advisor_cost_lower is false; see `.agro/evals/experiments/delegate-overhead/results-1233.md`.
+- **target**: `.agro/skills/delegate/SKILL.md`
+- **motivating patterns**: none (direct request)
+- **proposer**: /builder rule, issue #1233, candidate branch `cand/1233-headless-close` (`e9b4f98e`, not merged), evidence from `runs/screen-1233/` (5 question stops in 16 episodes) and `runs/paired-1233/`
+- **diff**:
+
+````diff
+diff --git a/.agro/skills/delegate/SKILL.md b/.agro/skills/delegate/SKILL.md
+index b9c0dd5a..1b5ee752 100644
+--- a/.agro/skills/delegate/SKILL.md
++++ b/.agro/skills/delegate/SKILL.md
+@@ -163,6 +163,18 @@ When every story has `passes: true`, do these steps:
+ 3. Fill the PR evidence sections from the `notes` in `prd.json`.
+ 4. Continue with the "Ready for review" step of `/git`.
+ 
++## Run without an operator
++
++A prompt that forbids push or GitHub starts a run without an operator. In
++this run, the advisor records each of these items in the final report, and
++then continues:
++
++- a hook blocks a write;
++- a step needs a push, GitHub, or a new issue.
++
++List the items under one heading, `## Not done`. Finish the other steps.
++Do not ask the operator. Do not wait for an answer.
++
+ ## Dry run
+ 
+ With `--dry-run`, print the waves and the dispatch records. Write nothing.
+
+## SI-0028 · 2026-09-27 · builder · PROPOSED
+
+- **proposal**: Require a `## Manual review` section in each PR body in one canonical shape, with a harness-template fallback, a final evidence story in `/prd`, and a `/delegate` Close step that fills the section.
+- **target**: `.agro/skills/git/SKILL.md`, `.agro/skills/prd/SKILL.md`, `.agro/skills/delegate/SKILL.md`
+- **motivating patterns**: mifunedev/agro-console#185 (operator request)
+- **proposer**: /builder rule, issue #1236
+- **diff**:
+
+````diff
+diff --git a/.agro/skills/git/SKILL.md b/.agro/skills/git/SKILL.md
+index 89a25b86..d1e225a6 100644
+--- a/.agro/skills/git/SKILL.md
++++ b/.agro/skills/git/SKILL.md
+@@ -308,6 +308,8 @@ operator approval of the plan. Writing a plan is not approval.
+    ```
+ 
+ 4. Open the draft PR. Build the body from `.github/pull_request_template.md`.
++   If the target repository has no `.github/pull_request_template.md`, use
++   `.github/pull_request_template.md` of the AGRO harness.
+    Put `Closes #<N>` in the body. Add a `## Stories` checklist from `prd.json`:
+ 
+    ```bash
+@@ -338,8 +340,10 @@ Do these steps in this sequence:
+   `awk '/^## /{s=($0=="## Lessons");n=0;next} s&&NF{n++} END{exit !(s&&n)}' .agro/tasks/<slug>/prd.md`
+   exits 0.
+ - The PR body evidence sections are non-empty: What the issue asked for, What
+-  was built, Where it diverged, What remains unverified, Verification, and
+-  Lessons. "None" or "Nothing" is a valid body.
++  was built, Where it diverged, Manual review, What remains unverified,
++  Verification, and Lessons. "None" or "Nothing" is a valid body, except for
++  Manual review. Manual review follows
++  [references/manual-review.md](references/manual-review.md).
+ - The repository's checks pass on the pushed branch (`/ci-status`).
+ 
+ ### After the merge
+````
+
+## SI-0029 · 2026-09-27 · builder · PROPOSED
+
+- **proposal**: Add a manual-only `/compact-handoff` task skill that prints exactly two prompts — a `/compact` carry-forward and a post-compaction next-task prompt — without executing either or promoting unapproved proposals to decisions.
+- **target**: `.agro/skills/compact-handoff/SKILL.md`
+- **motivating patterns**: none (direct request)
+- **proposer**: /builder command, operator prompt
+- **diff**:
+
+````diff
+diff --git a/.agro/skills/compact-handoff/SKILL.md b/.agro/skills/compact-handoff/SKILL.md
+new file mode 100644
+index 00000000..c7aac2e7
+--- /dev/null
++++ b/.agro/skills/compact-handoff/SKILL.md
+@@ -0,0 +1,89 @@
++---
++name: compact-handoff
++description: |
++  Generate exactly two ready-to-paste prompts from the current conversation: a
++  `/compact` prompt that carries the working state forward, and a
++  post-compaction prompt that directs the next unresolved task. Prints text
++  only; executes neither prompt.
++  TRIGGER when: /compact-handoff is invoked, or the operator asks for a compact
++  prompt plus a resume prompt, a compaction carry-forward, or a handoff before
++  compacting.
++argument-hint: "[focus]"
++disable-model-invocation: true
++---
++
++# Compact Handoff
++
++Arguments received: `$ARGUMENTS`
++
++Produce two prompts. Execute neither. Change no files, run no tools that
++mutate state, and dispatch no workers.
++
++## 1. Collect the state
++
++Read the conversation from the start. Weight later messages over earlier ones.
++If `$ARGUMENTS` is not empty, treat it as the focus for the next task and for
++what to keep. The focus adds no requirements.
++
++Extract each item below. Keep only what a fresh context needs to continue.
++
++- **Objective:** the overall goal, in the operator's terms.
++- **Latest instructions:** the most recent operator directions. A later
++  instruction replaces an earlier one on the same point.
++- **Decisions:** choices the operator made or approved.
++- **Constraints:** hard rules, boundaries, and exclusions in force.
++- **Completed work:** what is done, with the evidence that proves it.
++- **Essential references:** file paths, branches, PRs, issues, commands, URLs,
++  and identifiers that the next step needs. Copy them exactly.
++- **Unresolved next steps:** open work, in order, and any open question
++  blocked on the operator.
++
++Classify every candidate item before you keep it:
++
++| Status | Treatment |
++|---|---|
++| Approved by the operator | Keep as a decision. |
++| Proposed but not approved | Keep only as an open proposal, labeled as such. |
++| Superseded, abandoned, or answered | Drop. |
++| Tool output, file dumps, exploration, retries | Drop. Keep only the conclusion and its reference. |
++
++Do not invent a requirement, criterion, path, or decision. If a value that
++the next task needs is missing, write `<unknown: what is missing>`.
++
++## 2. Select the next task
++
++Pick the first unresolved step that waits on no operator answer. If every
++remaining step waits on the operator, make the next task "ask the operator" and name the
++blocking question. If no work remains, make the next task "confirm completion
++with the operator".
++
++## 3. Write the prompts
++
++**Prompt 1 — `/compact`.** Start with `/compact`. Follow it with an
++instruction that tells the summarizer what to preserve, grouped under the
++seven headings from step 1. Tell it to drop stale, superseded, and redundant
++context, raw tool output, and file dumps. Tell it to keep open proposals
++labeled as unapproved.
++
++**Prompt 2 — post-compaction.** Direct execution of the task from step 2.
++State:
++
++- **Objective:** what the task achieves.
++- **Scope:** what is in and out.
++- **Deliverable:** the concrete output.
++- **Completion criteria:** binary checks that prove the task is done.
++
++Point at files for re-anchoring instead of restating their contents. Take the
++criteria from the conversation. If the conversation does not define one, use
++`<unknown: criterion>`.
++
++## 4. Output
++
++Print only the two prompts, each in its own fenced `text` block, in order.
++Print no preamble, commentary, or closing text.
++
++## Examples
++
++- `/compact-handoff` — prompts for the current conversation.
++- `/compact-handoff finish the CI fix` — same, with the next task focused on
++  the CI fix.
+````
+
+## SI-0030 · 2026-09-27 · builder · PROPOSED
+
+- **proposal**: Change `/compact-handoff` output to the operator-specified shape: a `COMPACT_PROMPT:` label over a fenced one-line `/compact <instruction>` command and a `COMPACT_POST_PROMPT:` label over the fenced post-compaction prompt.
+- **target**: `.agro/skills/compact-handoff/SKILL.md`
+- **motivating patterns**: none (direct request)
+- **proposer**: /builder command, operator feedback on SI-0029, issue #1251
+- **diff**:
+
+````diff
+diff --git a/.agro/skills/compact-handoff/SKILL.md b/.agro/skills/compact-handoff/SKILL.md
+index c7aac2e7..f0f234a6 100644
+--- a/.agro/skills/compact-handoff/SKILL.md
++++ b/.agro/skills/compact-handoff/SKILL.md
+@@ -1,10 +1,10 @@
+ ---
+ name: compact-handoff
+ description: |
+-  Generate exactly two ready-to-paste prompts from the current conversation: a
+-  `/compact` prompt that carries the working state forward, and a
+-  post-compaction prompt that directs the next unresolved task. Prints text
+-  only; executes neither prompt.
++  Generate exactly two ready-to-paste prompts from the current conversation,
++  labeled COMPACT_PROMPT and COMPACT_POST_PROMPT: a `/compact` command that
++  carries the working state forward, and a post-compaction prompt that directs
++  the next unresolved task. Prints text only; executes neither prompt.
+   TRIGGER when: /compact-handoff is invoked, or the operator asks for a compact
+   prompt plus a resume prompt, a compaction carry-forward, or a handoff before
+   compacting.
+@@ -59,14 +59,21 @@ with the operator".
+ 
+ ## 3. Write the prompts
+ 
+-**Prompt 1 — `/compact`.** Start with `/compact`. Follow it with an
+-instruction that tells the summarizer what to preserve, grouped under the
+-seven headings from step 1. Tell it to drop stale, superseded, and redundant
+-context, raw tool output, and file dumps. Tell it to keep open proposals
+-labeled as unapproved.
++**`COMPACT_PROMPT` — the `/compact` command.** Write one command that the
++operator pastes as is. Start with `/compact ` and follow it on the same line
++with the compaction instruction. The instruction tells the summarizer what to
++keep to deliver the best result on the next task:
+ 
+-**Prompt 2 — post-compaction.** Direct execution of the task from step 2.
+-State:
++- the seven items from step 1, each with its concrete values;
++- open proposals, labeled as unapproved;
++- the references that the next task needs, copied exactly.
++
++The instruction also tells the summarizer to drop stale, superseded, and
++redundant context, raw tool output, and file dumps.
++
++**`COMPACT_POST_PROMPT` — the post-compaction prompt.** Write the message that
++the operator sends after the compaction. The message directs the task from
++step 2 and states:
+ 
+ - **Objective:** what the task achieves.
+ - **Scope:** what is in and out.
+@@ -79,8 +86,22 @@ criteria from the conversation. If the conversation does not define one, use
+ 
+ ## 4. Output
+ 
+-Print only the two prompts, each in its own fenced `text` block, in order.
+-Print no preamble, commentary, or closing text.
++Print exactly this shape and nothing else:
++
++````text
++COMPACT_PROMPT:
++```
++/compact <compaction instruction>
++```
++COMPACT_POST_PROMPT:
++```
++<post-compaction prompt>
++```
++````
++
++Use a plain fence with no language tag for each prompt. If a prompt contains
++a triple backtick, fence that prompt with four backticks. Print no preamble,
++commentary, or closing text.
+ 
+ ## Examples
+ 
+````

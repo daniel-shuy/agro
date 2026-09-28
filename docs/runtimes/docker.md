@@ -26,7 +26,7 @@ host-only error when run inside a sandbox — see
 
 If the daemon is not answering, `agro sandbox install docker` fails at the
 compose call. Install Docker Engine and start it — see
-<https://docs.docker.com/engine/install/> — then re-run the command.
+[https://docs.docker.com/engine/install/](https://docs.docker.com/engine/install/) — then re-run the command.
 `agro ps <name>` reports whether an existing sandbox is up.
 
 ## What this tier gives you, and what it does not

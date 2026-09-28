@@ -44,7 +44,7 @@ Run each check sequentially. If any check fails, **stop immediately** and report
 command -v agent-browser && agent-browser --version 2>&1 || echo "FAIL: agent-browser not found in PATH"
 ```
 
-If not found, install it through the CLI — the catalog entry pins the
+If not found, install agent-browser through the CLI — the catalog entry pins the
 version, fixes the binary's mode, and runs `agent-browser install --with-deps`
 for you:
 
@@ -52,7 +52,7 @@ for you:
 agro tool install agent-browser --yes
 ```
 
-`--yes` is required whenever stdin is not a TTY: the entry declares a
+The confirmation gate requires `--yes` whenever stdin is not a TTY: the entry declares a
 `~1 GB` download, and the confirmation gate refuses rather than prompting.
 
 That path applies in the sandbox. When no sandbox is reachable, the same
@@ -183,6 +183,16 @@ agent-browser screenshot "$SCREENSHOT_PATH"
 ```
 
 Example: `https://my-app.oh-local.localhost:8443/guide/configuration/` → `$PWD/.claude/screenshots/my-app.oh-local.localhost-8443--guide--configuration.png`
+
+### Annotated screenshots
+
+To take an annotated screenshot, use `scripts/annotate-screenshot.sh`. The script works on the page that agent-browser has open:
+
+```bash
+bash .agro/skills/agent-browser/scripts/annotate-screenshot.sh "$SCREENSHOT_PATH" '#title=the card title' '#status=the Baseline time'
+```
+
+The script adds one numbered red callout for each `<selector>=<label>` pair, takes the screenshot, and removes the callouts. It prints the `Callouts:` line for the screenshot, for example `Callouts: 1 is the card title. 2 is the Baseline time.`. Put that line under the screenshot. If a selector matches no element, the script names the selector, exits 1, and writes no file. On bad usage, the script exits 2.
 
 ### Step 5 — Report
 
