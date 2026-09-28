@@ -133,7 +133,6 @@ jobs:
   publish-image:
     name: Build, smoke, and publish GHCR image for ${{ matrix.platform }}
     needs: reserve
-    if: ${{ needs.reserve.outputs.publishedNoop != 'true' }}
     strategy:
       matrix:
         include:
@@ -239,7 +238,6 @@ jobs:
   publish-multiarch-manifest:
     name: Assemble and publish multi-arch manifest list
     needs: [reserve, publish-image]
-    if: ${{ needs.reserve.outputs.publishedNoop != 'true' }}
     runs-on: ubuntu-latest
     concurrency:
       group: release-image-${{ needs.reserve.outputs.releaseVersion }}
