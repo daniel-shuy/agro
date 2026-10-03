@@ -10,6 +10,7 @@ Update policy and release automation live in [`/git`](.claude/skills/git/SKILL.m
 
 ### Added
 
+- Add `pnpm test:coverage`, which reports v8 branch and line coverage for `.agro/cli/src/`, `.agro/scripts/`, and `.pi/` ([#1288](https://github.com/mifunedev/agro/issues/1288)).
 - Add a docs reference test that fails when `docs/` or `README.md` names an unknown `agro` verb, a missing repository path, an unknown `agro.json` key, or a broken link or anchor ([#1283](https://github.com/mifunedev/agro/issues/1283)).
 - Add a GitHub Codespaces badge near the top of the README to open AGRO in Codespaces ([#1259](https://github.com/mifunedev/agro/issues/1259)).
 - Add `escalate-timeouts.sh` to permit one 24-hour reminder and 72-hour expiry without granting approval ([#1192](https://github.com/mifunedev/agro/issues/1192)).
