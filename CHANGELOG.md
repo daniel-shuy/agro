@@ -8,6 +8,8 @@ Update policy and release automation live in [`/git`](.claude/skills/git/SKILL.m
 
 ## [Unreleased]
 
+## [0.16.2] - 2026-10-03
+
 ### Changed
 
 - Rename the curl installer from `get-agro.sh` to `install.sh`. Releases also upload `install.sh` as `get-agro.sh` until 0.18.0, which removes that alias ([#1309](https://github.com/mifunedev/agro/issues/1309)).
