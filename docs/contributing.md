@@ -48,9 +48,8 @@ pnpm run build
 pnpm test
 ```
 
-The rendered docs site lives in
-[`mifunedev/agro-web`](https://github.com/mifunedev/agro-web). In this
-repository, check the Markdown links and the index at `docs/README.md`.
+`docs/` is the documentation source. Check the Markdown links and the index
+at `docs/README.md`.
 
 ## Property Tests
 

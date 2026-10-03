@@ -27,6 +27,7 @@ Update policy and release automation live in [`/git`](.claude/skills/git/SKILL.m
 
 ### Removed
 
+- Remove the `notify-docs` release job and every `mifunedev/agro-web` pointer so releases no longer dispatch to the docs site and `docs/` is the only documentation source ([#1280](https://github.com/mifunedev/agro/issues/1280)).
 - Delete 22 docs with no operator journey, merge 4 into surviving docs, retire `docs/rfcs/`, and repoint `/architect`/`/git` to GitHub issues as the decision record ([#1275](https://github.com/mifunedev/agro/issues/1275)).
 - Remove the 145 eval probes after moving the 21 floor guards, including the deny hooks and sandbox privilege boundary, into vitest ([#1269](https://github.com/mifunedev/agro/issues/1269)).
 - Remove the `/eval` skill and runner, the `eval-probes` CI jobs, the `eval-weekly` cron, `/audit eval-quality`, and `/audit implementation` Gate 2 ([#1271](https://github.com/mifunedev/agro/issues/1271)).
@@ -36,6 +37,7 @@ Update policy and release automation live in [`/git`](.claude/skills/git/SKILL.m
 
 ### Changed
 
+- Point the documented installer commands at the `get-agro.sh` GitHub release asset and the `install.sh` raw file instead of `agro.mifune.dev` ([#1280](https://github.com/mifunedev/agro/issues/1280)).
 - Point the public-documentation surface check in `AGENTS.md` at `docs/` instead of `mifunedev/agro-web` ([#1267](https://github.com/mifunedev/agro/issues/1267)).
 - Set the Codex project default to `gpt-6-sol` at medium reasoning effort ([#1201](https://github.com/mifunedev/agro/issues/1201)).
 - Document host Codex updates when another npm global prefix shadows the selected installation ([#1201](https://github.com/mifunedev/agro/issues/1201)).

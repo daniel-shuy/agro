@@ -16,7 +16,7 @@ obligations. Canonical skills own reusable procedures.
 | `.agro/logs/`, `.agro/memories/` | Local logs and operator context, each with a scoped contract. |
 | `.agro/manifest.json` | The declared control-plane and root payload. |
 | `.devcontainer/` | Dockerfile, Compose configuration, entrypoint, and sandbox bootstrap assets. |
-| `docs/` | Human-facing source documentation. The rendered site lives in `mifunedev/agro-web`. |
+| `docs/` | Human-facing documentation source. |
 | `crons/` | Operator schedule definitions that the cron runtime reads. |
 | `.worktrees/` | Isolated branch checkouts for this repository. |
 | `projects/` | Independent repository clones; each clone keeps its own `.worktrees/`. |

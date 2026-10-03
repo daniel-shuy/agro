@@ -20,7 +20,7 @@ Without Node, use the bootstrap script. It installs `agro` to
 `~/.local/bin/agro` and offers to install Node:
 
 ```bash
-curl -fsSL https://agro.mifune.dev/get-agro.sh | bash
+curl -fsSL https://github.com/mifunedev/agro/releases/latest/download/get-agro.sh | bash
 ```
 
 Review-first install, PATH rules, and upgrades are in

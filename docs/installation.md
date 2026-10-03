@@ -40,18 +40,18 @@ It clones nothing and builds nothing. When Node.js ≥ 20 is missing, the script
 offers to install nvm and Node 22:
 
 ```bash
-curl -fsSL https://agro.mifune.dev/get-agro.sh | bash
+curl -fsSL https://github.com/mifunedev/agro/releases/latest/download/get-agro.sh | bash
 ```
 
 To review the script before it runs:
 
 ```bash
-curl -fsSL -o get-agro.sh https://agro.mifune.dev/get-agro.sh
+curl -fsSL -o get-agro.sh https://github.com/mifunedev/agro/releases/latest/download/get-agro.sh
 # Read get-agro.sh, then:
 bash get-agro.sh
 ```
 
-`source <(curl -fsSL https://agro.mifune.dev/get-agro.sh)` installs `agro` and puts
+`source <(curl -fsSL https://github.com/mifunedev/agro/releases/latest/download/get-agro.sh)` installs `agro` and puts
 it on the PATH of the current shell. After the piped form, run
 `export PATH="$HOME/.local/bin:$PATH"` to do the same.
 

@@ -48,7 +48,7 @@ Use `npx @mifune/agro` in place of `agro` in later commands.
 
 ```bash
 # Install AGRO to ~/.local/bin; offers Node.js setup if needed
-curl -fsSL https://agro.mifune.dev/get-agro.sh | bash
+curl -fsSL https://github.com/mifunedev/agro/releases/latest/download/get-agro.sh | bash
 ```
 
 For a download-and-review alternative, see [Installation](docs/installation.md).
@@ -337,7 +337,7 @@ Browse the [documentation](docs/README.md) or jump to a topic below.
 | Integrations | [GitHub](docs/integrations/github.md) · [Slack](docs/integrations/slack.md) · [Langfuse](docs/integrations/langfuse.md) |
 | Debugging and testing | [DebugMCP](docs/integrations/debugmcp.md) · [Property testing](docs/contributing.md#property-tests) |
 | Security | [Permissions and trust boundaries](docs/security-considerations.md) |
-| Contributing | [Contribution workflow](docs/contributing.md) · [Docs site source](https://github.com/mifunedev/agro-web) |
+| Contributing | [Contribution workflow](docs/contributing.md) |
 
 ## 🤝 Contributing & community
 
@@ -362,4 +362,4 @@ Apache-2.0 §6 grants no permission to use the Mifune or AGRO names, logos, or t
 
 ---
 
-[Documentation](docs/README.md) · [Docs website](https://agro.mifune.dev) · [Docs site source](https://github.com/mifunedev/agro-web)
+[Documentation](docs/README.md)
