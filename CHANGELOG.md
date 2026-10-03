@@ -8,20 +8,14 @@ Update policy and release automation live in [`/git`](.claude/skills/git/SKILL.m
 
 ## [Unreleased]
 
+## [0.16.1] - 2026-10-03
+
 ### Added
 
 - Add `pnpm test:coverage`, which reports v8 branch and line coverage for `.agro/cli/src/`, `.agro/scripts/`, and `.pi/` ([#1288](https://github.com/mifunedev/agro/issues/1288)).
 - Add a docs reference test that fails when `docs/` or `README.md` names an unknown `agro` verb, a missing repository path, an unknown `agro.json` key, or a broken link or anchor ([#1283](https://github.com/mifunedev/agro/issues/1283)).
 - Add a GitHub Codespaces badge near the top of the README to open AGRO in Codespaces ([#1259](https://github.com/mifunedev/agro/issues/1259)).
 - Add `escalate-timeouts.sh` to permit one 24-hour reminder and 72-hour expiry without granting approval ([#1192](https://github.com/mifunedev/agro/issues/1192)).
-- Add `manual-review-check.sh` to reject branch-pinned evidence links and screenshots without `Callouts:`, and `annotate-screenshot.sh` to add numbered callouts to agent-browser screenshots ([#1239](https://github.com/mifunedev/agro/issues/1239)).
-- Add `/compact-handoff`, a manual skill that prints a `/compact` carry-forward prompt and a post-compaction prompt for the next unresolved task without executing either ([#1248](https://github.com/mifunedev/agro/issues/1248)).
-- Require a `## Manual review` PR section with reviewer steps and observed results: annotated screenshots for a user journey, commands with example output for a server or CLI change ([#1236](https://github.com/mifunedev/agro/issues/1236)).
-- Add `agro sandbox upgrade <name> --version X.Y.Z` to recreate an image-mode sandbox with a pinned release while preserving its home data ([#1208](https://github.com/mifunedev/agro/issues/1208)).
-- Add `.github/assets/social-preview.jpg`, the 1280x640 repository social preview in the banner style that replaces the retired "Open Harness" image ([#1198](https://github.com/mifunedev/agro/issues/1198)).
-- Link GitHub Discussions from the README community section ([#1173](https://github.com/mifunedev/agro/issues/1173)).
-- Print a one-time star line after the first successful `agro sandbox install` in an interactive terminal; set `AGRO_NO_STAR_PROMPT=1` to suppress it ([#1175](https://github.com/mifunedev/agro/issues/1175)).
-- Read operator Slack decisions by message timestamp and report sender timestamps for unattended escalations ([#1181](https://github.com/mifunedev/agro/issues/1181)).
 
 ### Fixed
 
@@ -29,6 +23,8 @@ Update policy and release automation live in [`/git`](.claude/skills/git/SKILL.m
 - Pass `TYPESAFE_API_KEY` into the sandbox so new shells, cron fires, and services see the key after a restart, and stop `agro secret set` appending `.env` when a rule already ignores it ([#1289](https://github.com/mifunedev/agro/issues/1289)).
 - Read Slack tokens in the gateway, entrypoint, escalate, and healthcheck scripts from the `.env` that `agro secret set` writes, so a missing `.devcontainer/.env` link no longer hides them ([#1282](https://github.com/mifunedev/agro/issues/1282)).
 - Fix stale links, commands, and names across `docs/` and trim each doc to its operator journey with one owner per topic, in Simplified Technical English ([#1278](https://github.com/mifunedev/agro/issues/1278)).
+- Run the Hermes install smoke through the installed `.hermes/bin/hermes --run-module` launcher, since the current Hermes installer no longer creates `scripts/_hermes-python` ([#1273](https://github.com/mifunedev/agro/issues/1273)).
+- Pin the `agro` shebang to the nvm Node that `get-agro.sh` installs, so cron, systemd, cloud-init, and plain `ssh` commands run `~/.local/bin/agro` by its absolute path ([#1262](https://github.com/mifunedev/agro/issues/1262)).
 
 ### Removed
 
@@ -37,7 +33,6 @@ Update policy and release automation live in [`/git`](.claude/skills/git/SKILL.m
 - Remove the 145 eval probes after moving the 21 floor guards, including the deny hooks and sandbox privilege boundary, into vitest ([#1269](https://github.com/mifunedev/agro/issues/1269)).
 - Remove the `/eval` skill and runner, the `eval-probes` CI jobs, the `eval-weekly` cron, `/audit eval-quality`, and `/audit implementation` Gate 2 ([#1271](https://github.com/mifunedev/agro/issues/1271)).
 - Remove the eval experiments, datasets, capability benchmark, `/benchmark` skill, and finished task folders ([#1265](https://github.com/mifunedev/agro/issues/1265)).
-- Remove the project Pi recap package so new sessions no longer load `/recap` by default ([#1179](https://github.com/mifunedev/agro/issues/1179)).
 - Remove `.agro/knowledge/` and the `/wiki` skill so plans and skills no longer query a frozen knowledge tree and `agro vendor` stops shipping it ([#1277](https://github.com/mifunedev/agro/issues/1277)).
 
 ### Changed
@@ -46,18 +41,44 @@ Update policy and release automation live in [`/git`](.claude/skills/git/SKILL.m
 - Cut 55 test units with no unique coverage, make the herdr-default order checks able to fail, and run the `node:test` suites under vitest ([#1288](https://github.com/mifunedev/agro/issues/1288)).
 - Point the documented installer commands at the `get-agro.sh` GitHub release asset and the `install.sh` raw file instead of `agro.mifune.dev` ([#1280](https://github.com/mifunedev/agro/issues/1280)).
 - Point the public-documentation surface check in `AGENTS.md` at `docs/` instead of `mifunedev/agro-web` ([#1267](https://github.com/mifunedev/agro/issues/1267)).
+
+## [0.16.0] - 2026-09-28
+
+### Added
+
+- Add `manual-review-check.sh` to reject branch-pinned evidence links and screenshots without `Callouts:`, and `annotate-screenshot.sh` to add numbered callouts to agent-browser screenshots ([#1239](https://github.com/mifunedev/agro/issues/1239)).
+- Add `/compact-handoff`, a manual skill that prints a `/compact` carry-forward prompt and a post-compaction prompt for the next unresolved task without executing either ([#1248](https://github.com/mifunedev/agro/issues/1248)).
+- Require a `## Manual review` PR section with reviewer steps and observed results: annotated screenshots for a user journey, commands with example output for a server or CLI change ([#1236](https://github.com/mifunedev/agro/issues/1236)).
+- Add `agro sandbox upgrade <name> --version X.Y.Z` to recreate an image-mode sandbox with a pinned release while preserving its home data ([#1208](https://github.com/mifunedev/agro/issues/1208)).
+- Add `.github/assets/social-preview.jpg`, the 1280x640 repository social preview in the banner style that replaces the retired "Open Harness" image ([#1198](https://github.com/mifunedev/agro/issues/1198)).
+
+### Changed
+
 - Set the Codex project default to `gpt-6-sol` at medium reasoning effort ([#1201](https://github.com/mifunedev/agro/issues/1201)).
 - Document host Codex updates when another npm global prefix shadows the selected installation ([#1201](https://github.com/mifunedev/agro/issues/1201)).
-- Use a YAML Slack app manifest for Pi setup and provide a copyable version in the Slack docs while preserving the app's permissions, events, and admin commands ([#1177](https://github.com/mifunedev/agro/issues/1177)).
-- Use `~/.agro/workspaces/harness` for implicit host installs and `agro workspace create`, while retaining explicitly named `default` workspaces and recorded roots ([#1183](https://github.com/mifunedev/agro/issues/1183)).
 
 ### Fixed
 
-- Run the Hermes install smoke through the installed `.hermes/bin/hermes --run-module` launcher, since the current Hermes installer no longer creates `scripts/_hermes-python` ([#1273](https://github.com/mifunedev/agro/issues/1273)).
-- Pin the `agro` shebang to the nvm Node that `get-agro.sh` installs, so cron, systemd, cloud-init, and plain `ssh` commands run `~/.local/bin/agro` by its absolute path ([#1262](https://github.com/mifunedev/agro/issues/1262)).
 - Pin PR evidence links to the head commit SHA so screenshots still render after the branch is deleted, and drop `### Visual Reference` from the feature issue template ([#1239](https://github.com/mifunedev/agro/issues/1239)).
 - Restore the running container image after a failed upgrade of an unpinned sandbox, or refuse the upgrade if that image cannot be inspected ([#1217](https://github.com/mifunedev/agro/issues/1217)).
 - Record `docker-engine` and `desktop` host installs without a `~/.local` prefix, and make `agro tool uninstall` link manual removal steps for both ([#1185](https://github.com/mifunedev/agro/issues/1185)).
+
+## [0.15.1] - 2026-09-26
+
+### Added
+
+- Link GitHub Discussions from the README community section ([#1173](https://github.com/mifunedev/agro/issues/1173)).
+- Print a one-time star line after the first successful `agro sandbox install` in an interactive terminal; set `AGRO_NO_STAR_PROMPT=1` to suppress it ([#1175](https://github.com/mifunedev/agro/issues/1175)).
+- Read operator Slack decisions by message timestamp and report sender timestamps for unattended escalations ([#1181](https://github.com/mifunedev/agro/issues/1181)).
+
+### Removed
+
+- Remove the project Pi recap package so new sessions no longer load `/recap` by default ([#1179](https://github.com/mifunedev/agro/issues/1179)).
+
+### Changed
+
+- Use a YAML Slack app manifest for Pi setup and provide a copyable version in the Slack docs while preserving the app's permissions, events, and admin commands ([#1177](https://github.com/mifunedev/agro/issues/1177)).
+- Use `~/.agro/workspaces/harness` for implicit host installs and `agro workspace create`, while retaining explicitly named `default` workspaces and recorded roots ([#1183](https://github.com/mifunedev/agro/issues/1183)).
 
 ## [0.15.0] - 2026-09-24
 
