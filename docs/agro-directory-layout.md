@@ -12,7 +12,6 @@ obligations. Canonical skills own reusable procedures.
 | `.agro/cli/` | The `agro` CLI package. |
 | `.agro/scripts/`, `.agro/install/` | Lifecycle scripts, runtime helpers, and image installation inputs. |
 | `.agro/skills/`, `.agro/hooks/`, `.agro/skills.lock` | Shared procedures, hooks, and pack metadata. |
-| `.agro/knowledge/` | Tracked source pages, patterns, external captures, and a generated index; ignored `local/` scratch. |
 | `.agro/tasks/` | Task plans (`prd.md`) and story state (`prd.json`). |
 | `.agro/logs/`, `.agro/memories/` | Local logs and operator context, each with a scoped contract. |
 | `.agro/manifest.json` | The declared control-plane and root payload. |

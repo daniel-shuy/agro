@@ -32,6 +32,7 @@ Update policy and release automation live in [`/git`](.claude/skills/git/SKILL.m
 - Remove the `/eval` skill and runner, the `eval-probes` CI jobs, the `eval-weekly` cron, `/audit eval-quality`, and `/audit implementation` Gate 2 ([#1271](https://github.com/mifunedev/agro/issues/1271)).
 - Remove the eval experiments, datasets, capability benchmark, `/benchmark` skill, and finished task folders ([#1265](https://github.com/mifunedev/agro/issues/1265)).
 - Remove the project Pi recap package so new sessions no longer load `/recap` by default ([#1179](https://github.com/mifunedev/agro/issues/1179)).
+- Remove `.agro/knowledge/` and the `/wiki` skill so plans and skills no longer query a frozen knowledge tree and `agro vendor` stops shipping it ([#1277](https://github.com/mifunedev/agro/issues/1277)).
 
 ### Changed
 

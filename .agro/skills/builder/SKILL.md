@@ -65,10 +65,6 @@ steps.
   frontmatter, structure, tone, and validation conventions.
 - Search for an existing artifact with the same purpose. Prefer a focused update or
   explicit consolidation over a near-duplicate.
-- Consult compiled harness patterns before proposing a change. Run
-  `/wiki query <artifact-name-or-subsystem> --patterns` and read what it returns:
-  each page records a failure mode, its root cause, and a workaround this harness
-  already paid for. Cite the motivating `[[pattern-...]]` slugs in the report.
 
 ### 2. Define the contract
 
